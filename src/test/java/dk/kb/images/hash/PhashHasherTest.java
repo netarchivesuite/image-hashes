@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *   4.  2D DCT bug check: H-gradient and V-gradient produce different hashes.
  *   5.  Hex round-trip correct.
  *   6.  Hamming distance arithmetic correct.
- *   7.  Robustness: same image resized differently still hashes near-identically.
+ *   7.  Reobustness: same image resized differently still hashes near-identically.
  */
 class PhashHasherTest {
 
