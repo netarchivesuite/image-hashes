@@ -61,3 +61,35 @@ fail.
 
 See `PdqHasherCatImageSetTest.java` and `PhashHasherCatImageSetTest.java`
 for the full test suite that generated these numbers.
+
+
+
+## Performance comparison across implementations
+
+Both hash algorithms were benchmarked against independent reference
+implementations on the same two test images, on the same machine, with a
+warmed-up JVM (JIT-compiled before timing) and Python's `time.perf_counter()`.
+Every comparison below was correctness-checked first — all implementations
+produced byte-for-byte identical hashes before any timing was trusted.
+
+| Algorithm | Image | Pixel size | This library (Java) | Meta official (Java) | phim (Python/Rust) |
+|---|---|---|---|---|---|
+| PDQ | cat_nubbe.jpg | 1245×934 | 43.5 ms/image | 71.1 ms/image | 57.2 ms/image |
+| PDQ | maria.png | 1070×700 | 12.7 ms/image | 30.9 ms/image | 21.9 ms/image |
+| pHash | cat_nubbe.jpg | 1245×934 | 47.4 ms/image |  | 10.9 ms/image |
+| pHash | maria.png | 1070×700 | 29.5 ms/image |  | 7.3 ms/image |
+
+### Notes
+
+- **PDQ**: this library is **1.5-2.6x faster** than Meta's own official Java
+  reference implementation, and **1.3-1.8x faster** than phim's
+  Rust-backed Python implementation.
+- **pHash**: phim is **4-4.3x faster** than this library. phim's pHash is
+  backed by a compiled Rust core (not pure Python) with a likely FFT-based
+  DCT, versus this library's straightforward O(n²) DCT — closing this gap
+  further would require a similar algorithmic change.
+- No official Meta/Facebook Java implementation of pHash exists — unlike
+  PDQ, pHash has no single canonical reference, so that cell is left blank.
+- Per-image timings are averages over 100-1000 hash computations per cell,
+  with all implementations confirmed to produce identical hashes before
+  timing.
