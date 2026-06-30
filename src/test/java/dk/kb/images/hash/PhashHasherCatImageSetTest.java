@@ -1,0 +1,228 @@
+package dk.kb.images.hash;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * pHash tests against a fixed set of real-photo variants.
+ *
+ * The original image (cat_01_original.jpg) is loaded and hashed exactly
+ * once in {@link #setUp()}. Each test method below loads one transformed
+ * variant, hashes it, and computes the Hamming distance back to the
+ * original. The assertion in each method is left for manual calibration —
+ * see the measured reference values noted in each test's comment.
+ *
+ * Image set background: all variants are derived from the same source
+ * photo (a yawning cat) using a fixed set of transforms — see the
+ * conversation/README for how each file was generated. Geometric
+ * transforms (rotation, mirroring, cropping) are included deliberately:
+ * pHash is not rotation- or mirror-invariant by design, so those tests are
+ * expected to demonstrate a LARGE distance, documenting a known
+ * limitation rather than catching a bug.
+ *
+ * Reference distances measured against this Java implementation
+ * (64-bit hash, max distance 64):
+ *
+ *   cat_01_original.jpg        0    (identical)
+ *   cat_02_downscaled.jpg      0    (25% resolution)
+ *   cat_03_grayscale.jpg       0    (colour removed)
+ *   cat_04_rotated45.jpg      28    (45-degree rotation)
+ *   cat_05_rotated90.jpg      32    (90-degree rotation)
+ *   cat_06_rotated180.jpg     34    (180-degree rotation)
+ *   cat_07_mirrored.jpg       30    (horizontal flip)
+ *   cat_08_noise.jpg           0    (visible random noise)
+ *   cat_09_text_opaque.jpg     6    (opaque caption bar)
+ *   cat_10_text_overlay.jpg    2    (translucent watermark)
+ *   cat_11_jpeg_lowquality.jpg 0    (quality=15 recompression)
+ *   cat_12_cropped.jpg        32    (15% cropped off each edge)
+ */
+class PhashHasherCatImageSetTest {
+
+    /** Classpath-relative location: src/test/resources/test_images/ */
+    private static final String IMAGE_DIR = "test_images/";
+
+    private static String originalHash;
+
+    @BeforeAll
+    static void setUp() throws IOException {
+        BufferedImage original = loadImage("cat_01_original.jpg");
+        originalHash = PhashHasher.getHash(original);
+    }
+
+    @Test
+    @DisplayName("Original image matches itself (sanity check)")
+    void original() throws IOException {
+        BufferedImage img = loadImage("cat_01_original.jpg");
+        String hash = PhashHasher.getHash(img);
+        int distance = PhashHasher.hammingDistance(originalHash, hash);
+        System.out.println("cat_01_original.jpg distance = " + distance);
+
+        // TODO: assert expected distance (measured: 0)
+    }
+
+    @Test
+    @DisplayName("Downscaled to 25% resolution")
+    void downscaled() throws IOException {
+        BufferedImage img = loadImage("cat_02_downscaled.jpg");
+        String hash = PhashHasher.getHash(img);
+        int distance = PhashHasher.hammingDistance(originalHash, hash);
+        System.out.println("cat_02_downscaled.jpg distance = " + distance);
+
+        // TODO: assert expected distance (measured: 0)
+    }
+
+    @Test
+    @DisplayName("Converted to grayscale")
+    void grayscale() throws IOException {
+        BufferedImage img = loadImage("cat_03_grayscale.jpg");
+        String hash = PhashHasher.getHash(img);
+        int distance = PhashHasher.hammingDistance(originalHash, hash);
+        System.out.println("cat_03_grayscale.jpg distance = " + distance);
+
+        // TODO: assert expected distance (measured: 0)
+    }
+
+    @Test
+    @DisplayName("Rotated 45 degrees (expected to fail similarity threshold)")
+    void rotated45() throws IOException {
+        BufferedImage img = loadImage("cat_04_rotated45.jpg");
+        String hash = PhashHasher.getHash(img);
+        int distance = PhashHasher.hammingDistance(originalHash, hash);
+        System.out.println("cat_04_rotated45.jpg distance = " + distance);
+
+        // TODO: assert expected distance (measured: 28) -- documents a known
+        // pHash limitation: the algorithm is not rotation-invariant.
+    }
+
+    @Test
+    @DisplayName("Rotated 90 degrees (expected to fail similarity threshold)")
+    void rotated90() throws IOException {
+        BufferedImage img = loadImage("cat_05_rotated90.jpg");
+        String hash = PhashHasher.getHash(img);
+        int distance = PhashHasher.hammingDistance(originalHash, hash);
+        System.out.println("cat_05_rotated90.jpg distance = " + distance);
+
+        // TODO: assert expected distance (measured: 32) -- documents a known
+        // pHash limitation: the algorithm is not rotation-invariant.
+    }
+
+    @Test
+    @DisplayName("Rotated 180 degrees (expected to fail similarity threshold)")
+    void rotated180() throws IOException {
+        BufferedImage img = loadImage("cat_06_rotated180.jpg");
+        String hash = PhashHasher.getHash(img);
+        int distance = PhashHasher.hammingDistance(originalHash, hash);
+        System.out.println("cat_06_rotated180.jpg distance = " + distance);
+
+        // TODO: assert expected distance (measured: 34) -- documents a known
+        // pHash limitation: the algorithm is not rotation-invariant.
+    }
+
+    @Test
+    @DisplayName("Mirrored horizontally (expected to fail similarity threshold)")
+    void mirrored() throws IOException {
+        BufferedImage img = loadImage("cat_07_mirrored.jpg");
+        String hash = PhashHasher.getHash(img);
+        int distance = PhashHasher.hammingDistance(originalHash, hash);
+        System.out.println("cat_07_mirrored.jpg distance = " + distance);
+
+        // TODO: assert expected distance (measured: 30) -- documents a known
+        // pHash limitation: the algorithm is not mirror-invariant.
+    }
+
+    @Test
+    @DisplayName("Visible random pixel noise added")
+    void noise() throws IOException {
+        BufferedImage img = loadImage("cat_08_noise.jpg");
+        String hash = PhashHasher.getHash(img);
+        int distance = PhashHasher.hammingDistance(originalHash, hash);
+        System.out.println("cat_08_noise.jpg distance = " + distance);
+
+        // TODO: assert expected distance (measured: 0)
+    }
+
+    @Test
+    @DisplayName("Opaque caption bar added")
+    void textOpaque() throws IOException {
+        BufferedImage img = loadImage("cat_09_text_opaque.jpg");
+        String hash = PhashHasher.getHash(img);
+        int distance = PhashHasher.hammingDistance(originalHash, hash);
+        System.out.println("cat_09_text_opaque.jpg distance = " + distance);
+
+        // TODO: assert expected distance (measured: 6)
+    }
+
+    @Test
+    @DisplayName("Translucent watermark text overlay added")
+    void textOverlay() throws IOException {
+        BufferedImage img = loadImage("cat_10_text_overlay.jpg");
+        String hash = PhashHasher.getHash(img);
+        int distance = PhashHasher.hammingDistance(originalHash, hash);
+        System.out.println("cat_10_text_overlay.jpg distance = " + distance);
+
+        // TODO: assert expected distance (measured: 2)
+    }
+
+    @Test
+    @DisplayName("Heavy JPEG recompression (quality 15)")
+    void jpegLowQuality() throws IOException {
+        BufferedImage img = loadImage("cat_11_jpeg_lowquality.jpg");
+        String hash = PhashHasher.getHash(img);
+        int distance = PhashHasher.hammingDistance(originalHash, hash);
+        System.out.println("cat_11_jpeg_lowquality.jpg distance = " + distance);
+
+        // TODO: assert expected distance (measured: 0)
+    }
+
+    @Test
+    @DisplayName("Cropped 15% off each edge (expected to fail similarity threshold)")
+    void cropped() throws IOException {
+        BufferedImage img = loadImage("cat_12_cropped.jpg");
+        String hash = PhashHasher.getHash(img);
+        int distance = PhashHasher.hammingDistance(originalHash, hash);
+        System.out.println("cat_12_cropped.jpg distance = " + distance);
+
+        // TODO: assert expected distance (measured: 32) -- cropping shifts
+        // the framing enough that pHash's similarity threshold is exceeded.
+    }
+
+    // -----------------------------------------------------------------------
+
+    private static BufferedImage loadImage(String filename) throws IOException {
+        String resourcePath = IMAGE_DIR + filename;
+        InputStream in = PhashHasherCatImageSetTest.class
+            .getClassLoader()
+            .getResourceAsStream(resourcePath);
+
+        if (in == null) {
+            // Classpath lookup failed (resource not copied to target/test-classes,
+            // or the working directory differs from what the test runner assumes).
+            // Fall back to reading directly from the Maven source layout so the
+            // test still works even if the build hasn't run a resources-copy step.
+            java.io.File fallback = new java.io.File("src/test/resources/" + resourcePath);
+            if (fallback.exists()) {
+                in = new java.io.FileInputStream(fallback);
+            }
+        }
+
+        try {
+            assertNotNull(in, "Could not find test resource '" + resourcePath + "' on the classpath, "
+                + "and no fallback file at src/test/resources/" + resourcePath
+                + " (resolved from working directory " + new java.io.File(".").getAbsolutePath() + "). "
+                + "Run 'mvn test-compile' (or a clean build) to ensure test resources are copied to "
+                + "target/test-classes before running this test directly from an IDE.");
+            BufferedImage img = javax.imageio.ImageIO.read(in);
+            assertNotNull(img, "ImageIO could not decode resource: " + resourcePath);
+            return img;
+        } finally {
+            if (in != null) in.close();
+        }
+    }
+}
