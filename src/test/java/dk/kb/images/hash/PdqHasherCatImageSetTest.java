@@ -48,20 +48,20 @@ class PdqHasherCatImageSetTest {
     /** Classpath-relative location: src/test/resources/test_images/ */
     private static final String IMAGE_DIR = "test_images/";
 
-    private static PdqHasher.Result originalHash;
+    private static String originalHash;
 
     @BeforeAll
     static void setUp() throws IOException {
         BufferedImage original = loadImage("cat_01_original.jpg");
-        originalHash = PdqHasher.hash(original);
+        originalHash = PdqHasher.getHash(original);
     }
 
     @Test
     @DisplayName("Original image matches itself (sanity check)")
     void original() throws IOException {
         BufferedImage img = loadImage("cat_01_original.jpg");
-        PdqHasher.Result hash = PdqHasher.hash(img);
-        int distance = originalHash.hammingDistance(hash);
+        String hash = PdqHasher.getHash(img);
+        int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_01_original.jpg distance = " + distance);
 
         // TODO: assert expected distance (measured: 0)
@@ -71,8 +71,8 @@ class PdqHasherCatImageSetTest {
     @DisplayName("Downscaled to 25% resolution")
     void downscaled() throws IOException {
         BufferedImage img = loadImage("cat_02_downscaled.jpg");
-        PdqHasher.Result hash = PdqHasher.hash(img);
-        int distance = originalHash.hammingDistance(hash);
+        String hash = PdqHasher.getHash(img);
+        int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_02_downscaled.jpg distance = " + distance);
 
         // TODO: assert expected distance (measured: 16)
@@ -82,8 +82,8 @@ class PdqHasherCatImageSetTest {
     @DisplayName("Converted to grayscale")
     void grayscale() throws IOException {
         BufferedImage img = loadImage("cat_03_grayscale.jpg");
-        PdqHasher.Result hash = PdqHasher.hash(img);
-        int distance = originalHash.hammingDistance(hash);
+        String hash = PdqHasher.getHash(img);
+        int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_03_grayscale.jpg distance = " + distance);
 
         // TODO: assert expected distance (measured: 2)
@@ -93,8 +93,8 @@ class PdqHasherCatImageSetTest {
     @DisplayName("Rotated 45 degrees (expected to fail similarity threshold)")
     void rotated45() throws IOException {
         BufferedImage img = loadImage("cat_04_rotated45.jpg");
-        PdqHasher.Result hash = PdqHasher.hash(img);
-        int distance = originalHash.hammingDistance(hash);
+        String hash = PdqHasher.getHash(img);
+        int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_04_rotated45.jpg distance = " + distance);
 
         // TODO: assert expected distance (measured: 114) -- documents a known
@@ -105,8 +105,8 @@ class PdqHasherCatImageSetTest {
     @DisplayName("Rotated 90 degrees (expected to fail similarity threshold)")
     void rotated90() throws IOException {
         BufferedImage img = loadImage("cat_05_rotated90.jpg");
-        PdqHasher.Result hash = PdqHasher.hash(img);
-        int distance = originalHash.hammingDistance(hash);
+        String hash = PdqHasher.getHash(img);
+        int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_05_rotated90.jpg distance = " + distance);
 
         // TODO: assert expected distance (measured: 136) -- documents a known
@@ -117,8 +117,8 @@ class PdqHasherCatImageSetTest {
     @DisplayName("Rotated 180 degrees (expected to fail similarity threshold)")
     void rotated180() throws IOException {
         BufferedImage img = loadImage("cat_06_rotated180.jpg");
-        PdqHasher.Result hash = PdqHasher.hash(img);
-        int distance = originalHash.hammingDistance(hash);
+        String hash = PdqHasher.getHash(img);
+        int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_06_rotated180.jpg distance = " + distance);
 
         // TODO: assert expected distance (measured: 130) -- documents a known
@@ -129,8 +129,8 @@ class PdqHasherCatImageSetTest {
     @DisplayName("Mirrored horizontally (expected to fail similarity threshold)")
     void mirrored() throws IOException {
         BufferedImage img = loadImage("cat_07_mirrored.jpg");
-        PdqHasher.Result hash = PdqHasher.hash(img);
-        int distance = originalHash.hammingDistance(hash);
+        String hash = PdqHasher.getHash(img);
+        int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_07_mirrored.jpg distance = " + distance);
 
         // TODO: assert expected distance (measured: 128) -- documents a known
@@ -141,8 +141,8 @@ class PdqHasherCatImageSetTest {
     @DisplayName("Visible random pixel noise added")
     void noise() throws IOException {
         BufferedImage img = loadImage("cat_08_noise.jpg");
-        PdqHasher.Result hash = PdqHasher.hash(img);
-        int distance = originalHash.hammingDistance(hash);
+        String hash = PdqHasher.getHash(img);
+        int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_08_noise.jpg distance = " + distance);
 
         // TODO: assert expected distance (measured: 2)
@@ -152,8 +152,8 @@ class PdqHasherCatImageSetTest {
     @DisplayName("Opaque caption bar added")
     void textOpaque() throws IOException {
         BufferedImage img = loadImage("cat_09_text_opaque.jpg");
-        PdqHasher.Result hash = PdqHasher.hash(img);
-        int distance = originalHash.hammingDistance(hash);
+        String hash = PdqHasher.getHash(img);
+        int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_09_text_opaque.jpg distance = " + distance);
 
         // TODO: assert expected distance (measured: 40)
@@ -163,8 +163,8 @@ class PdqHasherCatImageSetTest {
     @DisplayName("Translucent watermark text overlay added")
     void textOverlay() throws IOException {
         BufferedImage img = loadImage("cat_10_text_overlay.jpg");
-        PdqHasher.Result hash = PdqHasher.hash(img);
-        int distance = originalHash.hammingDistance(hash);
+        String hash = PdqHasher.getHash(img);
+        int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_10_text_overlay.jpg distance = " + distance);
 
         // TODO: assert expected distance (measured: 10)
@@ -174,8 +174,8 @@ class PdqHasherCatImageSetTest {
     @DisplayName("Heavy JPEG recompression (quality 15)")
     void jpegLowQuality() throws IOException {
         BufferedImage img = loadImage("cat_11_jpeg_lowquality.jpg");
-        PdqHasher.Result hash = PdqHasher.hash(img);
-        int distance = originalHash.hammingDistance(hash);
+        String hash = PdqHasher.getHash(img);
+        int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_11_jpeg_lowquality.jpg distance = " + distance);
 
         // TODO: assert expected distance (measured: 4)
@@ -185,8 +185,8 @@ class PdqHasherCatImageSetTest {
     @DisplayName("Cropped 15% off each edge (expected to fail similarity threshold)")
     void cropped() throws IOException {
         BufferedImage img = loadImage("cat_12_cropped.jpg");
-        PdqHasher.Result hash = PdqHasher.hash(img);
-        int distance = originalHash.hammingDistance(hash);
+        String hash = PdqHasher.getHash(img);
+        int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_12_cropped.jpg distance = " + distance);
 
         // TODO: assert expected distance (measured: 130) -- cropping shifts
@@ -197,14 +197,32 @@ class PdqHasherCatImageSetTest {
 
     private static BufferedImage loadImage(String filename) throws IOException {
         String resourcePath = IMAGE_DIR + filename;
-        try (InputStream in = PdqHasherCatImageSetTest.class
-                .getClassLoader()
-                .getResourceAsStream(resourcePath)) {
-            assertNotNull(in, "Could not find test resource on classpath: " + resourcePath
-                + " (expected at src/test/resources/" + resourcePath + ")");
+        InputStream in = PdqHasherCatImageSetTest.class
+            .getClassLoader()
+            .getResourceAsStream(resourcePath);
+
+        if (in == null) {
+            // Classpath lookup failed (resource not copied to target/test-classes,
+            // or the working directory differs from what the test runner assumes).
+            // Fall back to reading directly from the Maven source layout so the
+            // test still works even if the build hasn't run a resources-copy step.
+            java.io.File fallback = new java.io.File("src/test/resources/" + resourcePath);
+            if (fallback.exists()) {
+                in = new java.io.FileInputStream(fallback);
+            }
+        }
+
+        try {
+            assertNotNull(in, "Could not find test resource '" + resourcePath + "' on the classpath, "
+                + "and no fallback file at src/test/resources/" + resourcePath
+                + " (resolved from working directory " + new java.io.File(".").getAbsolutePath() + "). "
+                + "Run 'mvn test-compile' (or a clean build) to ensure test resources are copied to "
+                + "target/test-classes before running this test directly from an IDE.");
             BufferedImage img = javax.imageio.ImageIO.read(in);
             assertNotNull(img, "ImageIO could not decode resource: " + resourcePath);
             return img;
+        } finally {
+            if (in != null) in.close();
         }
     }
 }

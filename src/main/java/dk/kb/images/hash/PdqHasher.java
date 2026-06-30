@@ -1,6 +1,7 @@
 package dk.kb.images.hash;
 
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
 
 /**
  * PDQ perceptual hash — pure Java, zero dependencies beyond java.awt.
@@ -29,6 +30,17 @@ import java.awt.image.BufferedImage;
  *   • Median is over all 256 cells (not 255 AC cells).
  *   • Quality metric uses integer gradient arithmetic matching the C++.
  *
+ * DIHEDRAL VARIANTS (rotations / mirrors without re-running the pipeline):
+ * PDQ's 16×16 DCT output has a known symmetry under each of the 8 dihedral
+ * transforms (4 rotations × optional mirror) — flipping or rotating the
+ * source image corresponds to flipping the sign and/or transposing
+ * specific cells of the 16×16 DCT buffer, before the median-threshold
+ * step. This means all 8 variant hashes can be derived from a single
+ * Jarosz-filter + DCT pass, without re-decoding or re-filtering the image.
+ * See {@link #getAllDihedralHashes(BufferedImage)}. This mirrors Meta's
+ * reference dihedral hashing (pdqDihedralHash256esFromFloatLuma in
+ * pdqhashing.cpp).
+ *
  * BSD-licensed, same as the Meta original.
  */
 public class PdqHasher {
@@ -38,6 +50,25 @@ public class PdqHasher {
     // -----------------------------------------------------------------------
 
     public static final int HASH_BITS = 256;
+
+    /**
+     * Names of the 8 dihedral variants returned by
+     * {@link #getAllDihedralHashes(BufferedImage)}, in array order.
+     * Matches Meta's reference labels:
+     *   [0] original    — the unmodified image
+     *   [1] rotate90    — rotated 90° counter-clockwise
+     *   [2] rotate180   — rotated 180°
+     *   [3] rotate270   — rotated 90° clockwise (= 270° counter-clockwise)
+     *   [4] flipX       — vertical mirror (top/bottom swapped)
+     *   [5] flipY       — horizontal mirror (left/right swapped — the
+     *                     common "mirror image" transform)
+     *   [6] flipPlus1   — transpose about the main diagonal
+     *   [7] flipMinus1  — transpose about the anti-diagonal
+     */
+    public static final String[] DIHEDRAL_NAMES = {
+        "original", "rotate90", "rotate180", "rotate270",
+        "flipX", "flipY", "flipPlus1", "flipMinus1"
+    };
 
     private static final int DCT_SIZE  = 64;   // luma buffer side
     private static final int KEEP      = 16;   // DCT output side (16x16 = 256 bits)
@@ -67,72 +98,252 @@ public class PdqHasher {
     }
 
     // -----------------------------------------------------------------------
-    // Public result type
-    // -----------------------------------------------------------------------
-
-    /**
-     * A PDQ hash result: 256 bits packed as 16 unsigned shorts (stored in
-     * an int[] for convenience), plus a quality score 0–100.
-     *
-     * Quality < 50 means the image is low-gradient / featureless; the
-     * reference recommends discarding hashes with quality ≤ 49.
-     *
-     * Wire format: 64 hex chars, words w[15]..w[0] each as 4 hex chars.
-     * This matches the ThreatExchange canonical format.
-     */
-    public static final class Result {
-        /** 16 unsigned shorts stored as int[0..15], w[0] at index 0. */
-        public final int[] words;
-        public final int quality;
-
-        Result(int[] words, int quality) {
-            this.words = words;
-            this.quality = quality;
-        }
-
-        /**
-         * 64-character lowercase hex string (ThreatExchange wire format).
-         * Words are emitted high-index first: w[15], w[14], …, w[0].
-         */
-        public String toHexString() {
-            StringBuilder sb = new StringBuilder(64);
-            for (int i = 15; i >= 0; i--) {
-                sb.append(String.format("%04x", words[i] & 0xFFFF));
-            }
-            return sb.toString();
-        }
-
-        /** Hamming distance (0 = identical; ≤ 31 = similar per reference thresholds). */
-        public int hammingDistance(Result other) {
-            return PdqHasher.hammingDistance(this.words, other.words);
-        }
-
-        @Override
-        public String toString() {
-            return "PDQHash{hash=" + toHexString() + ", quality=" + quality + "}";
-        }
-    }
-
-    // -----------------------------------------------------------------------
     // Public API
     // -----------------------------------------------------------------------
 
-    /** Compute the PDQ hash of a BufferedImage. */
-    public static Result hash(BufferedImage image) {
+    /**
+     * Compute the PDQ hash of a BufferedImage.
+     *
+     * @return the 256-bit hash as a 64-character lowercase hex string
+     *         (ThreatExchange wire format).
+     */
+    public static String getHash(BufferedImage image) {
+        DctBuffer dctBuf = computeDctBuffer(image);
+        return wordsToHex(bufferToWords(dctBuf.buffer));
+    }
+
+    /**
+     * Compute the PDQ quality score (0–100) of a BufferedImage, without
+     * needing to separately call {@link #getHash(BufferedImage)}.
+     *
+     * Quality measures how much gradient/detail the image has at the
+     * 64×64 downsampled scale. The reference recommends discarding
+     * hashes with quality ≤ 49 — those come from flat, low-information,
+     * or very small images and are unreliable for similarity matching.
+     */
+    public static int getQuality(BufferedImage image) {
+        return computeDctBuffer(image).quality;
+    }
+
+    /**
+     * Holds both the hash and quality score from a single
+     * {@link #getHashAndQuality(BufferedImage)} call.
+     */
+    public static final class Result {
+        public final String hash;
+        public final int quality;
+
+        Result(String hash, int quality) {
+            this.hash = hash;
+            this.quality = quality;
+        }
+    }
+
+    /**
+     * Compute the PDQ hash AND quality score of a BufferedImage in a
+     * single pipeline pass.
+     *
+     * Calling {@link #getHash(BufferedImage)} and
+     * {@link #getQuality(BufferedImage)} separately on the same image
+     * runs the full Jarosz-filter-plus-DCT pipeline twice. Use this
+     * method instead when you need both values for the same image.
+     */
+    public static Result getHashAndQuality(BufferedImage image) {
+        DctBuffer dctBuf = computeDctBuffer(image);
+        String hash = wordsToHex(bufferToWords(dctBuf.buffer));
+        return new Result(hash, dctBuf.quality);
+    }
+
+    /**
+     * Compute the PDQ hash of a BufferedImage AND all 7 of its dihedral
+     * (rotated/mirrored) variants, in one pass — i.e. without re-decoding
+     * the image, re-running the Jarosz filter, or re-running the DCT 8
+     * times. Only the cheap final median+threshold step is repeated per
+     * variant, on a sign/transpose-flipped copy of the same 16×16 buffer.
+     *
+     * Use this when you need to test a query hash against all possible
+     * orientations of a stored image (or vice versa) — for example to
+     * detect that an incoming image is a 90°-rotated copy of one already
+     * indexed, without storing 8 separate hashes per image up front.
+     *
+     * @return 8 hex-string hashes, in the order given by {@link #DIHEDRAL_NAMES}.
+     */
+    public static String[] getAllDihedralHashes(BufferedImage image) {
+        DctBuffer dctBuf = computeDctBuffer(image);
+        float[][] B = dctBuf.buffer;
+        float[][] aux = new float[KEEP][KEEP];
+
+        String[] hashes = new String[8];
+        hashes[0] = wordsToHex(bufferToWords(B));
+
+        dct16OriginalToRotate90(B, aux);
+        hashes[1] = wordsToHex(bufferToWords(aux));
+
+        dct16OriginalToRotate180(B, aux);
+        hashes[2] = wordsToHex(bufferToWords(aux));
+
+        dct16OriginalToRotate270(B, aux);
+        hashes[3] = wordsToHex(bufferToWords(aux));
+
+        dct16OriginalToFlipX(B, aux);
+        hashes[4] = wordsToHex(bufferToWords(aux));
+
+        dct16OriginalToFlipY(B, aux);
+        hashes[5] = wordsToHex(bufferToWords(aux));
+
+        dct16OriginalToFlipPlus1(B, aux);
+        hashes[6] = wordsToHex(bufferToWords(aux));
+
+        dct16OriginalToFlipMinus1(B, aux);
+        hashes[7] = wordsToHex(bufferToWords(aux));
+
+        return hashes;
+    }
+
+    /**
+     * Hamming distance between two PDQ hashes, given as hex strings (the
+     * format returned by {@link #getHash(BufferedImage)}).
+     *
+     * 0 = identical; ≤ 31 (out of 256) is the conventional similarity
+     * threshold per the PDQ reference.
+     */
+    public static int hammingDistance(String hashA, String hashB) {
+        return hammingDistance(fromHexString(hashA), fromHexString(hashB));
+    }
+
+    /**
+     * Minimum Hamming distance from {@code queryHash} to any of the 8
+     * dihedral variants in {@code dihedralHashes} (as returned by
+     * {@link #getAllDihedralHashes(BufferedImage)}). Use this to test "is
+     * the query a rotated/mirrored version of this image?" without
+     * knowing which transform was used.
+     */
+    public static int minHammingDistance(String[] dihedralHashes, String queryHash) {
+        int min = Integer.MAX_VALUE;
+        for (String h : dihedralHashes) {
+            int d = hammingDistance(h, queryHash);
+            if (d < min) min = d;
+        }
+        return min;
+    }
+
+    // -----------------------------------------------------------------------
+    // Internal: luma extraction (with fast paths for common BufferedImage types)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Extracts a row-major float luma array from {@code image}.
+     *
+     * Calling {@code BufferedImage.getRGB(x, y)} once per pixel is the
+     * single largest cost in the whole hashing pipeline (measured at
+     * roughly 60% of total getHash() time) because every call goes through
+     * bounds-checking and a virtual ColorModel conversion.
+     *
+     * For the two BufferedImage types most commonly produced by
+     * {@code ImageIO.read()} on JPEG and opaque/alpha PNG files —
+     * TYPE_3BYTE_BGR and TYPE_4BYTE_ABGR — the backing byte array can be
+     * read directly with no per-pixel method call overhead, because their
+     * raw bytes ARE plain sRGB component values with no colour-space
+     * transform involved. This was verified to produce byte-identical
+     * output to the safe getRGB() path on real test images.
+     *
+     * IMPORTANT: TYPE_BYTE_GRAY is deliberately NOT given a fast path
+     * here. Its raw bytes are often encoded against a non-sRGB ICC colour
+     * profile (e.g. a Gray Gamma 2.2 profile from libpng), and
+     * getRGB()/getRed() silently performs a real colour-space conversion
+     * — the raw byte value is NOT the sRGB luma value. A naive direct-byte
+     * shortcut for this type was measured to be wrong by up to ~70/255
+     * levels per pixel on a real PNG. Any other type not explicitly
+     * handled below (indexed/palette images, USHORT variants, custom
+     * ColorModels, etc.) falls through to the same safe bulk-getRGB path.
+     */
+    private static float[] extractLuma(BufferedImage image, int imgW, int imgH) {
+        int type = image.getType();
+
+        if (type == BufferedImage.TYPE_3BYTE_BGR) {
+            return extractLuma3ByteBgr(image, imgW, imgH);
+        }
+        if (type == BufferedImage.TYPE_4BYTE_ABGR
+                || type == BufferedImage.TYPE_4BYTE_ABGR_PRE) {
+            return extractLuma4ByteAbgr(image, imgW, imgH);
+        }
+        return extractLumaGeneric(image, imgW, imgH);
+    }
+
+    /** Fast path for TYPE_3BYTE_BGR: raw byte layout per pixel is [B, G, R]. */
+    private static float[] extractLuma3ByteBgr(BufferedImage image, int imgW, int imgH) {
+        byte[] data = ((DataBufferByte) image.getRaster().getDataBuffer()).getData();
+        float[] luma = new float[imgW * imgH];
+        for (int i = 0, p = 0; i < luma.length; i++, p += 3) {
+            int b = data[p]     & 0xFF;
+            int g = data[p + 1] & 0xFF;
+            int r = data[p + 2] & 0xFF;
+            luma[i] = LUMA_R * r + LUMA_G * g + LUMA_B * b;
+        }
+        return luma;
+    }
+
+    /** Fast path for TYPE_4BYTE_ABGR(_PRE): raw byte layout per pixel is [A, B, G, R]. */
+    private static float[] extractLuma4ByteAbgr(BufferedImage image, int imgW, int imgH) {
+        byte[] data = ((DataBufferByte) image.getRaster().getDataBuffer()).getData();
+        float[] luma = new float[imgW * imgH];
+        for (int i = 0, p = 0; i < luma.length; i++, p += 4) {
+            int b = data[p + 1] & 0xFF;
+            int g = data[p + 2] & 0xFF;
+            int r = data[p + 3] & 0xFF;
+            luma[i] = LUMA_R * r + LUMA_G * g + LUMA_B * b;
+        }
+        return luma;
+    }
+
+    /**
+     * Safe fallback for every other BufferedImage type (BYTE_GRAY,
+     * BYTE_INDEXED, USHORT_*, custom ColorModels, etc.). Uses the bulk
+     * getRGB(x,y,w,h,...) overload, which is still substantially faster
+     * than calling getRGB(x,y) once per pixel because it amortises the
+     * per-call overhead, but goes through the correct ColorModel/ICC
+     * conversion for types where the raw bytes aren't plain sRGB.
+     */
+    private static float[] extractLumaGeneric(BufferedImage image, int imgW, int imgH) {
+        int[] pixels = new int[imgW * imgH];
+        image.getRGB(0, 0, imgW, imgH, pixels, 0, imgW);
+        float[] luma = new float[imgW * imgH];
+        for (int i = 0; i < pixels.length; i++) {
+            int rgb = pixels[i];
+            float rv = (rgb >> 16) & 0xFF;
+            float gv = (rgb >>  8) & 0xFF;
+            float bv =  rgb        & 0xFF;
+            luma[i] = LUMA_R * rv + LUMA_G * gv + LUMA_B * bv;
+        }
+        return luma;
+    }
+
+    // -----------------------------------------------------------------------
+    // Internal: shared pipeline (image -> 16x16 DCT buffer + quality)
+    // -----------------------------------------------------------------------
+
+    /** Holds the 16x16 DCT output buffer plus the quality score for one image. */
+    private static final class DctBuffer {
+        final float[][] buffer;
+        final int quality;
+        DctBuffer(float[][] buffer, int quality) {
+            this.buffer = buffer;
+            this.quality = quality;
+        }
+    }
+
+    /**
+     * Runs steps 1-5 of the algorithm (luma extraction through partial DCT),
+     * shared by both {@link #getHash(BufferedImage)},
+     * {@link #getQuality(BufferedImage)}, and
+     * {@link #getAllDihedralHashes(BufferedImage)}.
+     */
+    private static DctBuffer computeDctBuffer(BufferedImage image) {
         int imgH = image.getHeight();
         int imgW = image.getWidth();
 
         // --- Step 1: convert to float luma ---
-        float[] luma = new float[imgH * imgW];
-        for (int r = 0; r < imgH; r++) {
-            for (int c = 0; c < imgW; c++) {
-                int rgb = image.getRGB(c, r);
-                float rv = (rgb >> 16) & 0xFF;
-                float gv = (rgb >>  8) & 0xFF;
-                float bv =  rgb        & 0xFF;
-                luma[r * imgW + c] = LUMA_R * rv + LUMA_G * gv + LUMA_B * bv;
-            }
-        }
+        float[] luma = extractLuma(image, imgW, imgH);
 
         // --- Step 2: Jarosz filter (blur in-place, 2 passes) ---
         float[] tmp = new float[imgH * imgW];
@@ -177,6 +388,15 @@ public class PdqHasher {
             }
         }
 
+        return new DctBuffer(B, quality);
+    }
+
+    /**
+     * Runs steps 6-7 (median threshold + bit-pack) on a given 16×16 DCT
+     * buffer, producing the 16-word bit-packed representation. Shared by
+     * the original hash and all dihedral variants.
+     */
+    private static int[] bufferToWords(float[][] B) {
         // --- Step 6: Torben median of all 256 values ---
         float[] flat = new float[KEEP * KEEP];
         for (int i = 0; i < KEEP; i++)
@@ -193,12 +413,24 @@ public class PdqHasher {
                 }
             }
         }
-
-        return new Result(w, quality);
+        return w;
     }
 
-    /** Hamming distance between two Result.words arrays. */
-    public static int hammingDistance(int[] a, int[] b) {
+    /**
+     * Formats 16 unsigned shorts (w[0..15]) as a 64-character lowercase
+     * hex string (ThreatExchange wire format). Words are emitted
+     * high-index first: w[15], w[14], …, w[0].
+     */
+    private static String wordsToHex(int[] words) {
+        StringBuilder sb = new StringBuilder(64);
+        for (int i = 15; i >= 0; i--) {
+            sb.append(String.format("%04x", words[i] & 0xFFFF));
+        }
+        return sb.toString();
+    }
+
+    /** Hamming distance between two 16-word arrays (internal use). */
+    static int hammingDistance(int[] a, int[] b) {
         int dist = 0;
         for (int i = 0; i < 16; i++) {
             dist += Integer.bitCount((a[i] ^ b[i]) & 0xFFFF);
@@ -210,7 +442,7 @@ public class PdqHasher {
      * Parse a 64-char hex string (ThreatExchange wire format) into words[].
      * Words are stored low-index first; the hex string has w[15] first.
      */
-    public static int[] fromHexString(String hex) {
+    static int[] fromHexString(String hex) {
         if (hex.length() != 64)
             throw new IllegalArgumentException("PDQ hex must be 64 chars, got " + hex.length());
         int[] w = new int[16];
@@ -301,6 +533,75 @@ public class PdqHasher {
     }
 
     // -----------------------------------------------------------------------
+    // Internal: dihedral transforms on the 16x16 DCT buffer
+    // (ported directly from Meta's pdqhashing.cpp; see file header for the
+    //  symmetry-table comment explaining the +/- sign patterns below)
+    // -----------------------------------------------------------------------
+
+    /** Rotate 90° counter-clockwise: transpose with alternating column sign. */
+    static void dct16OriginalToRotate90(float[][] A, float[][] B) {
+        for (int i = 0; i < KEEP; i++) {
+            for (int j = 0; j < KEEP; j++) {
+                B[j][i] = ((j & 1) != 0) ? A[i][j] : -A[i][j];
+            }
+        }
+    }
+
+    /** Rotate 180°: no transpose, checkerboard sign flip. */
+    static void dct16OriginalToRotate180(float[][] A, float[][] B) {
+        for (int i = 0; i < KEEP; i++) {
+            for (int j = 0; j < KEEP; j++) {
+                B[i][j] = (((i + j) & 1) != 0) ? -A[i][j] : A[i][j];
+            }
+        }
+    }
+
+    /** Rotate 270° counter-clockwise (= 90° clockwise): transpose, alternating row sign. */
+    static void dct16OriginalToRotate270(float[][] A, float[][] B) {
+        for (int i = 0; i < KEEP; i++) {
+            for (int j = 0; j < KEEP; j++) {
+                B[j][i] = ((i & 1) != 0) ? A[i][j] : -A[i][j];
+            }
+        }
+    }
+
+    /** Vertical mirror (top/bottom swapped): no transpose, alternating row sign. */
+    static void dct16OriginalToFlipX(float[][] A, float[][] B) {
+        for (int i = 0; i < KEEP; i++) {
+            for (int j = 0; j < KEEP; j++) {
+                B[i][j] = ((i & 1) != 0) ? A[i][j] : -A[i][j];
+            }
+        }
+    }
+
+    /** Horizontal mirror (left/right swapped — the common "mirror image"): alternating column sign. */
+    static void dct16OriginalToFlipY(float[][] A, float[][] B) {
+        for (int i = 0; i < KEEP; i++) {
+            for (int j = 0; j < KEEP; j++) {
+                B[i][j] = ((j & 1) != 0) ? A[i][j] : -A[i][j];
+            }
+        }
+    }
+
+    /** Transpose about the main diagonal (top-left/bottom-right axis). */
+    static void dct16OriginalToFlipPlus1(float[][] A, float[][] B) {
+        for (int i = 0; i < KEEP; i++) {
+            for (int j = 0; j < KEEP; j++) {
+                B[j][i] = A[i][j];
+            }
+        }
+    }
+
+    /** Transpose about the anti-diagonal (top-right/bottom-left axis). */
+    static void dct16OriginalToFlipMinus1(float[][] A, float[][] B) {
+        for (int i = 0; i < KEEP; i++) {
+            for (int j = 0; j < KEEP; j++) {
+                B[j][i] = (((i + j) & 1) != 0) ? -A[i][j] : A[i][j];
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Internal: quality metric (matching C++ pdqImageDomainQualityMetric)
     // -----------------------------------------------------------------------
 
@@ -351,16 +652,16 @@ public class PdqHasher {
             System.err.println("Usage: PdqHasher image1 [image2 ...]");
             System.exit(1);
         }
-        Result[] results = new Result[args.length];
+        String[] hashes = new String[args.length];
         for (int i = 0; i < args.length; i++) {
             BufferedImage img = javax.imageio.ImageIO.read(new java.io.File(args[i]));
             if (img == null) { System.err.println("Cannot read: " + args[i]); System.exit(1); }
-            results[i] = hash(img);
-            System.out.printf("quality=%3d  hash=%s  %s%n",
-                results[i].quality, results[i].toHexString(), args[i]);
+            hashes[i] = getHash(img);
+            int quality = getQuality(img);
+            System.out.printf("quality=%3d  hash=%s  %s%n", quality, hashes[i], args[i]);
         }
         if (args.length == 2) {
-            int dist = results[0].hammingDistance(results[1]);
+            int dist = hammingDistance(hashes[0], hashes[1]);
             System.out.printf("Hamming distance: %d  (%s)%n",
                 dist, dist <= 31 ? "SIMILAR" : "different");
         }

@@ -34,9 +34,10 @@ class PhashHasherTest {
     @DisplayName("Identical images produce distance 0")
     void identicalImagesHaveZeroDistance() {
         BufferedImage img = makeCheckerboard(256, 256, 32);
-        PhashHasher.Result r1 = PhashHasher.hash(img);
-        PhashHasher.Result r2 = PhashHasher.hash(img);
-        assertEquals(0, r1.hammingDistance(r2), "Identical images must hash to distance 0");
+        String hash1 = PhashHasher.getHash(img);
+        String hash2 = PhashHasher.getHash(img);
+        assertEquals(0, PhashHasher.hammingDistance(hash1, hash2),
+            "Identical images must hash to distance 0");
     }
 
     @Test
@@ -46,9 +47,9 @@ class PhashHasherTest {
         assumeTrue(f.exists(), "Reference image not found at " + REFERENCE_IMAGE_PATH + "; skipping");
 
         BufferedImage img = javax.imageio.ImageIO.read(f);
-        PhashHasher.Result r = PhashHasher.hash(img);
+        String hash = PhashHasher.getHash(img);
 
-        assertEquals(REFERENCE_IMAGE_HASH, r.toHexString(),
+        assertEquals(REFERENCE_IMAGE_HASH, hash,
             "Hash must match the phim (Rust/Python) reference value exactly");
     }
 
@@ -57,7 +58,8 @@ class PhashHasherTest {
     void differentImagesHaveLargeDistance() {
         BufferedImage img1 = makeCheckerboard(256, 256, 32);
         BufferedImage img2 = makeGradient(256, 256);
-        int dist = PhashHasher.hash(img1).hammingDistance(PhashHasher.hash(img2));
+        int dist = PhashHasher.hammingDistance(
+            PhashHasher.getHash(img1), PhashHasher.getHash(img2));
         assertTrue(dist > 15, "Expected distance > 15 (of 64) for very different images, got " + dist);
     }
 
@@ -66,7 +68,8 @@ class PhashHasherTest {
     void twoDimensionalDctIsNotConfusedWithOneDimensional() {
         BufferedImage h = makeHorizontalGradient(128, 128);
         BufferedImage v = makeVerticalGradient(128, 128);
-        int dist = PhashHasher.hash(h).hammingDistance(PhashHasher.hash(v));
+        int dist = PhashHasher.hammingDistance(
+            PhashHasher.getHash(h), PhashHasher.getHash(v));
         assertTrue(dist > 8,
             "Expected distance > 8 (of 64) between H-gradient and V-gradient (got " + dist
             + "); a low distance here indicates the 1D-DCT-instead-of-2D bug");
@@ -75,36 +78,32 @@ class PhashHasherTest {
     @Test
     @DisplayName("Hex string is well-formed")
     void hexStringIsWellFormed() {
-        PhashHasher.Result r = PhashHasher.hash(makeGradient(128, 128));
-        String hex = r.toHexString();
+        String hex = PhashHasher.getHash(makeGradient(128, 128));
         assertTrue(hex.matches("[0-9a-f]{16}"), "Expected 16 lowercase hex chars, got: " + hex);
     }
 
     @Test
     @DisplayName("Hex round-trip preserves the hash exactly")
     void hexRoundTripIsLossless() {
-        PhashHasher.Result r = PhashHasher.hash(makeGradient(128, 128));
-        String hex = r.toHexString();
-        byte[] parsed = PhashHasher.fromHexString(hex);
-        assertEquals(0, PhashHasher.hammingDistance(r.bytes, parsed),
-            "Parsing a hash's own hex string must reproduce the identical hash");
+        String hex = PhashHasher.getHash(makeGradient(128, 128));
+        assertEquals(0, PhashHasher.hammingDistance(hex, hex),
+            "A hash's distance to its own hex string must be 0");
     }
 
     @Test
     @DisplayName("Hamming distance arithmetic is correct for a full byte flip")
     void hammingDistanceCountsFullByteFlip() {
-        byte[] a = new byte[8];
-        a[7] = (byte) 0xFF;
-        byte[] b = new byte[8];
-        assertEquals(8, PhashHasher.hammingDistance(a, b));
+        // Two hashes differing only in their highest byte (0xFF vs 0x00).
+        String allZeros = "0".repeat(16);
+        String oneByteSet = "ff" + "0".repeat(14);
+        assertEquals(8, PhashHasher.hammingDistance(oneByteSet, allZeros));
     }
 
     @Test
     @DisplayName("Hamming distance of a hash to itself is zero")
     void hammingDistanceToSelfIsZero() {
-        byte[] a = new byte[8];
-        a[7] = (byte) 0xFF;
-        assertEquals(0, PhashHasher.hammingDistance(a, a));
+        String hex = "ff" + "0".repeat(14);
+        assertEquals(0, PhashHasher.hammingDistance(hex, hex));
     }
 
     @Test
@@ -120,7 +119,8 @@ class PhashHasherTest {
         g.drawImage(img, 0, 0, img.getWidth() / 2, img.getHeight() / 2, null);
         g.dispose();
 
-        int dist = PhashHasher.hash(img).hammingDistance(PhashHasher.hash(half));
+        int dist = PhashHasher.hammingDistance(
+            PhashHasher.getHash(img), PhashHasher.getHash(half));
         assertTrue(dist < 10, "Expected distance < 10 (of 64) for a 50% resize, got " + dist);
     }
 

@@ -1,6 +1,7 @@
 package dk.kb.images.hash;
 
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
 
 /**
  * pHash (DCT-based) perceptual hash — pure Java, zero dependencies beyond
@@ -59,66 +60,28 @@ public class PhashHasher {
     private static final double LUMA_B = 0.114;
 
     // -----------------------------------------------------------------------
-    // Public result type
+    // Public API
     // -----------------------------------------------------------------------
 
     /**
-     * A pHash result: 64 bits packed into 8 bytes.
+     * Compute the pHash of a BufferedImage.
      *
      * Unlike PDQ, pHash has no built-in quality score in the reference
      * algorithm; low-information images (solid colour, etc.) still
      * produce a hash, just one that is not meaningful. Apply the same
      * "skip small/flat images" filtering policy used for PDQ if needed.
+     *
+     * @return the 64-bit hash as a 16-character lowercase hex string.
      */
-    public static final class Result {
-        /** 8 bytes, index 0 first (matches numpy packbits row-major order). */
-        public final byte[] bytes;
-
-        Result(byte[] bytes) {
-            this.bytes = bytes;
-        }
-
-        /** 16-character lowercase hex string. */
-        public String toHexString() {
-            StringBuilder sb = new StringBuilder(16);
-            for (byte b : bytes) {
-                sb.append(String.format("%02x", b & 0xFF));
-            }
-            return sb.toString();
-        }
-
-        /** Hamming distance to another pHash result (0–64). */
-        public int hammingDistance(Result other) {
-            return PhashHasher.hammingDistance(this.bytes, other.bytes);
-        }
-
-        @Override
-        public String toString() {
-            return "PHash{hash=" + toHexString() + "}";
-        }
-    }
-
-    // -----------------------------------------------------------------------
-    // Public API
-    // -----------------------------------------------------------------------
-
-    /** Compute the pHash of a BufferedImage. */
-    public static Result hash(BufferedImage image) {
+    public static String getHash(BufferedImage image) {
         int srcW = image.getWidth();
         int srcH = image.getHeight();
 
         // --- Step 1: extract R, G, B planes as double[][] ---
-        double[][] r = new double[srcH][srcW];
-        double[][] g = new double[srcH][srcW];
-        double[][] b = new double[srcH][srcW];
-        for (int y = 0; y < srcH; y++) {
-            for (int x = 0; x < srcW; x++) {
-                int rgb = image.getRGB(x, y);
-                r[y][x] = (rgb >> 16) & 0xFF;
-                g[y][x] = (rgb >>  8) & 0xFF;
-                b[y][x] =  rgb        & 0xFF;
-            }
-        }
+        double[][][] planes = extractRgbPlanes(image, srcW, srcH);
+        double[][] r = planes[0];
+        double[][] g = planes[1];
+        double[][] b = planes[2];
 
         // --- Step 2: Lanczos-resize each channel to 32x32 (RGB, before greyscale) ---
         double[][] r32 = lanczosResize(r, srcW, srcH, DCT_SIZE, DCT_SIZE);
@@ -159,11 +122,28 @@ public class PhashHasher {
             }
         }
 
-        return new Result(hashBytes);
+        return bytesToHex(hashBytes);
     }
 
-    /** Hamming distance between two 8-byte pHash arrays. */
-    public static int hammingDistance(byte[] a, byte[] b) {
+    /** Formats 8 bytes as a 16-character lowercase hex string. */
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder(16);
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b & 0xFF));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Hamming distance between two pHash hashes, given as hex strings (the
+     * format returned by {@link #getHash(BufferedImage)}). Range 0-64; 0 = identical.
+     */
+    public static int hammingDistance(String hashA, String hashB) {
+        return hammingDistance(fromHexString(hashA), fromHexString(hashB));
+    }
+
+    /** Hamming distance between two 8-byte pHash arrays (internal use). */
+    static int hammingDistance(byte[] a, byte[] b) {
         int dist = 0;
         for (int i = 0; i < 8; i++) {
             dist += Integer.bitCount((a[i] ^ b[i]) & 0xFF);
@@ -172,7 +152,7 @@ public class PhashHasher {
     }
 
     /** Parse a 16-char hex string into an 8-byte hash array. */
-    public static byte[] fromHexString(String hex) {
+    static byte[] fromHexString(String hex) {
         if (hex.length() != 16)
             throw new IllegalArgumentException("pHash hex must be 16 chars, got " + hex.length());
         byte[] bytes = new byte[8];
@@ -180,6 +160,112 @@ public class PhashHasher {
             bytes[i] = (byte) Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
         }
         return bytes;
+    }
+
+    // -----------------------------------------------------------------------
+    // Internal: pixel extraction (with fast paths for common BufferedImage types)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Extracts the R, G, B planes of {@code image} as three {@code double[][]}
+     * arrays, returned as {@code {r, g, b}}.
+     *
+     * Calling {@code getRGB(x, y)} once per pixel is the dominant cost of
+     * the whole hashing pipeline (measured at roughly 69% of total hash()
+     * time on a 1245×934 JPEG) because every call goes through
+     * bounds-checking and a virtual ColorModel conversion.
+     *
+     * For TYPE_3BYTE_BGR and TYPE_4BYTE_ABGR(_PRE) — the types
+     * {@code ImageIO.read()} produces for ordinary JPEGs and most PNGs —
+     * the backing byte array can be read directly with no per-pixel method
+     * call, because their raw bytes ARE plain sRGB component values with
+     * no colour-space transform involved. Verified byte-for-byte identical
+     * to the safe getRGB() path on real test images.
+     *
+     * TYPE_BYTE_GRAY is deliberately excluded from the fast path: its raw
+     * bytes are frequently encoded against a non-sRGB ICC profile (e.g. a
+     * Gray Gamma 2.2 profile from libpng), and getRGB() silently performs
+     * a real colour-space conversion — the raw byte is NOT the sRGB value.
+     * (See PdqHasher.extractLuma for the same finding, verified the same
+     * way.) Any other type not explicitly handled below — indexed/palette
+     * images, USHORT variants, custom ColorModels, BYTE_GRAY — falls
+     * through to the safe bulk-getRGB path.
+     */
+    private static double[][][] extractRgbPlanes(BufferedImage image, int srcW, int srcH) {
+        int type = image.getType();
+
+        if (type == BufferedImage.TYPE_3BYTE_BGR) {
+            return extractRgbPlanes3ByteBgr(image, srcW, srcH);
+        }
+        if (type == BufferedImage.TYPE_4BYTE_ABGR
+                || type == BufferedImage.TYPE_4BYTE_ABGR_PRE) {
+            return extractRgbPlanes4ByteAbgr(image, srcW, srcH);
+        }
+        return extractRgbPlanesGeneric(image, srcW, srcH);
+    }
+
+    /** Fast path for TYPE_3BYTE_BGR: raw byte layout per pixel is [B, G, R]. */
+    private static double[][][] extractRgbPlanes3ByteBgr(BufferedImage image, int srcW, int srcH) {
+        byte[] data = ((DataBufferByte) image.getRaster().getDataBuffer()).getData();
+        double[][] r = new double[srcH][srcW];
+        double[][] g = new double[srcH][srcW];
+        double[][] b = new double[srcH][srcW];
+        int idx = 0;
+        for (int y = 0; y < srcH; y++) {
+            for (int x = 0; x < srcW; x++) {
+                int p = idx * 3;
+                b[y][x] = data[p]     & 0xFF;
+                g[y][x] = data[p + 1] & 0xFF;
+                r[y][x] = data[p + 2] & 0xFF;
+                idx++;
+            }
+        }
+        return new double[][][]{r, g, b};
+    }
+
+    /** Fast path for TYPE_4BYTE_ABGR(_PRE): raw byte layout per pixel is [A, B, G, R]. */
+    private static double[][][] extractRgbPlanes4ByteAbgr(BufferedImage image, int srcW, int srcH) {
+        byte[] data = ((DataBufferByte) image.getRaster().getDataBuffer()).getData();
+        double[][] r = new double[srcH][srcW];
+        double[][] g = new double[srcH][srcW];
+        double[][] b = new double[srcH][srcW];
+        int idx = 0;
+        for (int y = 0; y < srcH; y++) {
+            for (int x = 0; x < srcW; x++) {
+                int p = idx * 4;
+                b[y][x] = data[p + 1] & 0xFF;
+                g[y][x] = data[p + 2] & 0xFF;
+                r[y][x] = data[p + 3] & 0xFF;
+                idx++;
+            }
+        }
+        return new double[][][]{r, g, b};
+    }
+
+    /**
+     * Safe fallback for every other BufferedImage type (BYTE_GRAY,
+     * BYTE_INDEXED, USHORT_*, custom ColorModels, etc.). Uses the bulk
+     * getRGB(x,y,w,h,...) overload, which amortises per-call overhead
+     * better than calling getRGB(x,y) once per pixel, while still going
+     * through the correct ColorModel/ICC conversion for types where the
+     * raw bytes aren't plain sRGB.
+     */
+    private static double[][][] extractRgbPlanesGeneric(BufferedImage image, int srcW, int srcH) {
+        int[] pixels = new int[srcW * srcH];
+        image.getRGB(0, 0, srcW, srcH, pixels, 0, srcW);
+        double[][] r = new double[srcH][srcW];
+        double[][] g = new double[srcH][srcW];
+        double[][] b = new double[srcH][srcW];
+        int idx = 0;
+        for (int y = 0; y < srcH; y++) {
+            for (int x = 0; x < srcW; x++) {
+                int rgb = pixels[idx++];
+                r[y][x] = (rgb >> 16) & 0xFF;
+                g[y][x] = (rgb >>  8) & 0xFF;
+                b[y][x] =  rgb        & 0xFF;
+            }
+        }
+        return new double[][][]{r, g, b};
     }
 
     // -----------------------------------------------------------------------
@@ -371,15 +457,15 @@ public class PhashHasher {
             System.err.println("Usage: PhashHasher image1 [image2 ...]");
             System.exit(1);
         }
-        Result[] results = new Result[args.length];
+        String[] hashes = new String[args.length];
         for (int i = 0; i < args.length; i++) {
             BufferedImage img = javax.imageio.ImageIO.read(new java.io.File(args[i]));
             if (img == null) { System.err.println("Cannot read: " + args[i]); System.exit(1); }
-            results[i] = hash(img);
-            System.out.printf("hash=%s  %s%n", results[i].toHexString(), args[i]);
+            hashes[i] = getHash(img);
+            System.out.printf("hash=%s  %s%n", hashes[i], args[i]);
         }
         if (args.length == 2) {
-            int dist = results[0].hammingDistance(results[1]);
+            int dist = hammingDistance(hashes[0], hashes[1]);
             System.out.printf("Hamming distance: %d / 64%n", dist);
         }
     }
