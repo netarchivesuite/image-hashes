@@ -141,8 +141,10 @@ public class PdqHasher {
 
     /**
      * Compute the PDQ hash AND quality score of a BufferedImage in a
-     * single pipeline pass.
-     *
+     * single pipeline pass. Small images can produce quality ≤ 49 and it
+     * recommended to discard those.
+     * Images with minimum(height,width) > 150 should have fine quality.
+     *  
      * Calling {@link #getHash(BufferedImage)} and
      * {@link #getQuality(BufferedImage)} separately on the same image
      * runs the full Jarosz-filter-plus-DCT pipeline twice. Use this
