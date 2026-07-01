@@ -90,6 +90,6 @@ Performance is identical for JPEG images of the same dimensions. The relative ra
 
 
 ### Lanczos resampling compatibility
-The pHash algorithm resizes the source image to 32×32 pixels using a Lanczos filter before computing the DCT. Lanczos is not a single deterministic standard — different libraries make different implementation choices and produce different pixel values, resulting in incompatible hashes from the same source image.
+The pHash algorithm resizes the source image to 32×32 pixels using a Lanczos filter before computing the 2D DCT. Lanczos is not a single deterministic standard — different libraries make different implementation choices and produce different pixel values, resulting in incompatible hashes from the same source image.
 This library produces byte-for-byte identical hashes to phim, as both use the same Lanczos variant.
 The following libraries produce different, incompatible hashes: OpenCV, TwelveMonkeys and scikit-image.
