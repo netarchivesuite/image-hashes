@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * Image set background: all variants are derived from the same source
  * photo (a yawning cat) using a fixed set of transforms — see the
- * conversation/README for how each file was generated. Geometric
+ * github README for how each file was generated. Geometric
  * transforms (rotation, mirroring, cropping) are included deliberately:
  * PDQ is not rotation- or mirror-invariant by design, so those tests are
  * expected to demonstrate a LARGE distance, documenting a known
