@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * PDQ hash tests against a fixed set of real-photo variants.
  *
+ * The image used for the test of of my cat Nubbe and he does not mind GDPR issues.
  * The original image (cat_01_original.jpg) is loaded and hashed exactly
  * once in {@link #setUp()}. Each test method below loads one transformed
  * variant, hashes it, and computes the Hamming distance back to the
@@ -48,6 +49,8 @@ class PdqHasherCatImageSetTest {
     /** Classpath-relative location: src/test/resources/test_images/ */
     private static final String IMAGE_DIR = "test_images/";
 
+    private static final int SIMILARITY_THRESHOLD=31; // Seems to be the general recommendation.
+    
     private static String originalHash;
 
     @BeforeAll
@@ -63,8 +66,8 @@ class PdqHasherCatImageSetTest {
         String hash = PdqHasher.getHash(img);
         int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_01_original.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 0)
+        assertEquals(0,  distance);
+        assertTrue(match(distance));
     }
 
     @Test
@@ -74,8 +77,8 @@ class PdqHasherCatImageSetTest {
         String hash = PdqHasher.getHash(img);
         int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_02_downscaled.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 16)
+        assertEquals(16,  distance);     
+        assertTrue(match(distance));
     }
 
     @Test
@@ -85,8 +88,8 @@ class PdqHasherCatImageSetTest {
         String hash = PdqHasher.getHash(img);
         int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_03_grayscale.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 2)
+        assertEquals(2,  distance);        
+        assertTrue(match(distance));
     }
 
     @Test
@@ -96,8 +99,8 @@ class PdqHasherCatImageSetTest {
         String hash = PdqHasher.getHash(img);
         int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_04_rotated45.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 114) -- documents a known
+        assertEquals(114,  distance);        
+        assertFalse(match(distance));
         // PDQ limitation: the algorithm is not rotation-invariant.
     }
 
@@ -108,8 +111,8 @@ class PdqHasherCatImageSetTest {
         String hash = PdqHasher.getHash(img);
         int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_05_rotated90.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 136) -- documents a known
+        assertEquals(136,  distance);
+        assertFalse(match(distance));
         // PDQ limitation: the algorithm is not rotation-invariant.
     }
 
@@ -120,8 +123,8 @@ class PdqHasherCatImageSetTest {
         String hash = PdqHasher.getHash(img);
         int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_06_rotated180.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 130) -- documents a known
+        assertEquals(130,  distance);
+        assertFalse(match(distance));
         // PDQ limitation: the algorithm is not rotation-invariant.
     }
 
@@ -132,8 +135,8 @@ class PdqHasherCatImageSetTest {
         String hash = PdqHasher.getHash(img);
         int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_07_mirrored.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 128) -- documents a known
+        assertEquals(128,  distance);
+        assertFalse(match(distance));
         // PDQ limitation: the algorithm is not mirror-invariant.
     }
 
@@ -144,8 +147,8 @@ class PdqHasherCatImageSetTest {
         String hash = PdqHasher.getHash(img);
         int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_08_noise.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 2)
+        assertEquals(2,  distance);
+        assertTrue(match(distance));
     }
 
     @Test
@@ -154,9 +157,9 @@ class PdqHasherCatImageSetTest {
         BufferedImage img = loadImage("cat_09_text_opaque.jpg");
         String hash = PdqHasher.getHash(img);
         int distance = PdqHasher.hammingDistance(originalHash, hash);
-        System.out.println("cat_09_text_opaque.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 40)
+        assertEquals(40,  distance);
+        assertFalse(match(distance));
+        //Just over threshold
     }
 
     @Test
@@ -165,9 +168,8 @@ class PdqHasherCatImageSetTest {
         BufferedImage img = loadImage("cat_10_text_overlay.jpg");
         String hash = PdqHasher.getHash(img);
         int distance = PdqHasher.hammingDistance(originalHash, hash);
-        System.out.println("cat_10_text_overlay.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 10)
+        assertEquals(10,  distance);
+        assertTrue(match(distance));
     }
 
     @Test
@@ -177,8 +179,8 @@ class PdqHasherCatImageSetTest {
         String hash = PdqHasher.getHash(img);
         int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_11_jpeg_lowquality.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 4)
+        assertEquals(4,  distance);
+        assertTrue(match(distance));
     }
 
     @Test
@@ -188,11 +190,16 @@ class PdqHasherCatImageSetTest {
         String hash = PdqHasher.getHash(img);
         int distance = PdqHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_12_cropped.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 130) -- cropping shifts
+        assertEquals(130,  distance);
+        assertFalse(match(distance));
         // the framing enough that PDQ's similarity threshold is exceeded.
     }
 
+    
+    private static boolean match(int distance) {
+        return (distance <= SIMILARITY_THRESHOLD);
+    }
+    
     // -----------------------------------------------------------------------
 
     private static BufferedImage loadImage(String filename) throws IOException {
