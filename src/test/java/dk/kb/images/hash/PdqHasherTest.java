@@ -29,10 +29,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 class PdqHasherTest {
 
-    private static final String REFERENCE_IMAGE_PATH = "/mnt/user-data/uploads/maria.png";
-    private static final String REFERENCE_IMAGE_HASH =
-        "aa74a9e4b3952eb95c5711e6a5b2dad1d5a852c62e0155b995ae2be4d823e31c";
-
+    private static final String REFERENCE_IMAGE = "cat_01_original.jpg";
+    private static final String REFERENCE_IMAGE_HASH = "7c744d5ce9c82d4ec65e6b138dd63b9699966644a360e1e1b165da19b6295c4b";
+                                                        
     @Test
     @DisplayName("Identical images produce distance 0")
     void identicalImagesHaveZeroDistance() {
@@ -46,10 +45,9 @@ class PdqHasherTest {
     @Test
     @DisplayName("Reference image hash matches Python/C++ reference value")
     void referenceImageMatchesKnownHash() throws IOException {
-        File f = new File(REFERENCE_IMAGE_PATH);
-        assumeTrue(f.exists(), "Reference image not found at " + REFERENCE_IMAGE_PATH + "; skipping");
+        
+        BufferedImage img= ImageLoadUtil.loadImage(REFERENCE_IMAGE);
 
-        BufferedImage img = javax.imageio.ImageIO.read(f);
         String hash = PdqHasher.getHash(img);
         int quality = PdqHasher.getQuality(img);
 

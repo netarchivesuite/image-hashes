@@ -27,8 +27,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 class PhashHasherTest {
 
-    private static final String REFERENCE_IMAGE_PATH = "/mnt/user-data/uploads/maria.png";
-    private static final String REFERENCE_IMAGE_HASH = "38e427759da86355";
+    private static final String REFERENCE_IMAGE = "cat_01_original.jpg";
+    private static final String REFERENCE_IMAGE_HASH = "d29499b7a706236b";
 
     @Test
     @DisplayName("Identical images produce distance 0")
@@ -42,13 +42,9 @@ class PhashHasherTest {
 
     @Test
     @DisplayName("Reference image hash matches phim reference value")
-    void referenceImageMatchesKnownHash() throws IOException {
-        File f = new File(REFERENCE_IMAGE_PATH);
-        assumeTrue(f.exists(), "Reference image not found at " + REFERENCE_IMAGE_PATH + "; skipping");
-
-        BufferedImage img = javax.imageio.ImageIO.read(f);
+    void referenceImageMatchesKnownHash() throws IOException {       
+        BufferedImage img= ImageLoadUtil.loadImage(REFERENCE_IMAGE);        
         String hash = PhashHasher.getHash(img);
-
         assertEquals(REFERENCE_IMAGE_HASH, hash,
             "Hash must match the phim (Rust/Python) reference value exactly");
     }
@@ -109,12 +105,11 @@ class PhashHasherTest {
     @Test
     @DisplayName("Resized version of the same image hashes near-identically")
     void resizedImageHasSmallDistance() throws IOException {
-        File f = new File(REFERENCE_IMAGE_PATH);
-        assumeTrue(f.exists(), "Reference image not found at " + REFERENCE_IMAGE_PATH + "; skipping");
-
-        BufferedImage img = javax.imageio.ImageIO.read(f);
+        
+        
+        BufferedImage img= ImageLoadUtil.loadImage(REFERENCE_IMAGE);
         BufferedImage half = new BufferedImage(
-            img.getWidth() / 2, img.getHeight() / 2, BufferedImage.TYPE_INT_RGB);
+         img.getWidth() / 2, img.getHeight() / 2, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = half.createGraphics();
         g.drawImage(img, 0, 0, img.getWidth() / 2, img.getHeight() / 2, null);
         g.dispose();

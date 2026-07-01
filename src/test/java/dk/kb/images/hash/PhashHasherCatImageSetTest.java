@@ -45,21 +45,19 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class PhashHasherCatImageSetTest {
 
-    /** Classpath-relative location: src/test/resources/test_images/ */
-    private static final String IMAGE_DIR = "test_images/";
     private static final int SIMILARITY_THRESHOLD=10; // Seems to be the general recommendation for pHash
     private static String originalHash;
 
     @BeforeAll
     static void setUp() throws IOException {
-        BufferedImage original = loadImage("cat_01_original.jpg");
+        BufferedImage original = ImageLoadUtil.loadImage("cat_01_original.jpg");
         originalHash = PhashHasher.getHash(original);         
     }
 
     @Test
     @DisplayName("Original image matches itself (sanity check)")
     void original() throws IOException {
-        BufferedImage img = loadImage("cat_01_original.jpg");
+        BufferedImage img = ImageLoadUtil.loadImage("cat_01_original.jpg");
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_01_original.jpg distance = " + distance);
@@ -70,7 +68,7 @@ class PhashHasherCatImageSetTest {
     @Test
     @DisplayName("Downscaled to 25% resolution")
     void downscaled() throws IOException {
-        BufferedImage img = loadImage("cat_02_downscaled.jpg");
+        BufferedImage img = ImageLoadUtil.loadImage("cat_02_downscaled.jpg");
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_02_downscaled.jpg distance = " + distance);
@@ -81,7 +79,7 @@ class PhashHasherCatImageSetTest {
     @Test
     @DisplayName("Converted to grayscale")
     void grayscale() throws IOException {
-        BufferedImage img = loadImage("cat_03_grayscale.jpg");
+        BufferedImage img = ImageLoadUtil.loadImage("cat_03_grayscale.jpg");
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_03_grayscale.jpg distance = " + distance);
@@ -92,7 +90,7 @@ class PhashHasherCatImageSetTest {
     @Test
     @DisplayName("Rotated 45 degrees (expected to fail similarity threshold)")
     void rotated45() throws IOException {
-        BufferedImage img = loadImage("cat_04_rotated45.jpg");
+        BufferedImage img = ImageLoadUtil.loadImage("cat_04_rotated45.jpg");
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_04_rotated45.jpg distance = " + distance);
@@ -104,7 +102,7 @@ class PhashHasherCatImageSetTest {
     @Test
     @DisplayName("Rotated 90 degrees (expected to fail similarity threshold)")
     void rotated90() throws IOException {
-        BufferedImage img = loadImage("cat_05_rotated90.jpg");
+        BufferedImage img = ImageLoadUtil.loadImage("cat_05_rotated90.jpg");
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_05_rotated90.jpg distance = " + distance);
@@ -116,7 +114,7 @@ class PhashHasherCatImageSetTest {
     @Test
     @DisplayName("Rotated 180 degrees (expected to fail similarity threshold)")
     void rotated180() throws IOException {
-        BufferedImage img = loadImage("cat_06_rotated180.jpg");
+        BufferedImage img = ImageLoadUtil.loadImage("cat_06_rotated180.jpg");
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_06_rotated180.jpg distance = " + distance);
@@ -127,7 +125,7 @@ class PhashHasherCatImageSetTest {
     @Test
     @DisplayName("Mirrored horizontally (expected to fail similarity threshold)")
     void mirrored() throws IOException {
-        BufferedImage img = loadImage("cat_07_mirrored.jpg");
+        BufferedImage img = ImageLoadUtil.loadImage("cat_07_mirrored.jpg");
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_07_mirrored.jpg distance = " + distance);
@@ -139,7 +137,7 @@ class PhashHasherCatImageSetTest {
     @Test
     @DisplayName("Visible random pixel noise added")
     void noise() throws IOException {
-        BufferedImage img = loadImage("cat_08_noise.jpg");
+        BufferedImage img = ImageLoadUtil.loadImage("cat_08_noise.jpg");
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_08_noise.jpg distance = " + distance);
@@ -150,7 +148,7 @@ class PhashHasherCatImageSetTest {
     @Test
     @DisplayName("Opaque caption bar added")
     void textOpaque() throws IOException {
-        BufferedImage img = loadImage("cat_09_text_opaque.jpg");
+        BufferedImage img = ImageLoadUtil.loadImage("cat_09_text_opaque.jpg");
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_09_text_opaque.jpg distance = " + distance);
@@ -161,7 +159,7 @@ class PhashHasherCatImageSetTest {
     @Test
     @DisplayName("Translucent watermark text overlay added")
     void textOverlay() throws IOException {
-        BufferedImage img = loadImage("cat_10_text_overlay.jpg");
+        BufferedImage img = ImageLoadUtil.loadImage("cat_10_text_overlay.jpg");
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_10_text_overlay.jpg distance = " + distance);
@@ -172,7 +170,7 @@ class PhashHasherCatImageSetTest {
     @Test
     @DisplayName("Heavy JPEG recompression (quality 15)")
     void jpegLowQuality() throws IOException {
-        BufferedImage img = loadImage("cat_11_jpeg_lowquality.jpg");
+        BufferedImage img = ImageLoadUtil.loadImage("cat_11_jpeg_lowquality.jpg");
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_11_jpeg_lowquality.jpg distance = " + distance);
@@ -183,7 +181,7 @@ class PhashHasherCatImageSetTest {
     @Test
     @DisplayName("Cropped 15% off each edge (expected to fail similarity threshold)")
     void cropped() throws IOException {
-        BufferedImage img = loadImage("cat_12_cropped.jpg");
+        BufferedImage img = ImageLoadUtil.loadImage("cat_12_cropped.jpg");
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_12_cropped.jpg distance = " + distance);
@@ -196,36 +194,5 @@ class PhashHasherCatImageSetTest {
         return (distance <= SIMILARITY_THRESHOLD);
     }
     
-    // -----------------------------------------------------------------------
-
-    private static BufferedImage loadImage(String filename) throws IOException {
-        String resourcePath = IMAGE_DIR + filename;
-        InputStream in = PhashHasherCatImageSetTest.class
-            .getClassLoader()
-            .getResourceAsStream(resourcePath);
-
-        if (in == null) {
-            // Classpath lookup failed (resource not copied to target/test-classes,
-            // or the working directory differs from what the test runner assumes).
-            // Fall back to reading directly from the Maven source layout so the
-            // test still works even if the build hasn't run a resources-copy step.
-            java.io.File fallback = new java.io.File("src/test/resources/" + resourcePath);
-            if (fallback.exists()) {
-                in = new java.io.FileInputStream(fallback);
-            }
-        }
-
-        try {
-            assertNotNull(in, "Could not find test resource '" + resourcePath + "' on the classpath, "
-                + "and no fallback file at src/test/resources/" + resourcePath
-                + " (resolved from working directory " + new java.io.File(".").getAbsolutePath() + "). "
-                + "Run 'mvn test-compile' (or a clean build) to ensure test resources are copied to "
-                + "target/test-classes before running this test directly from an IDE.");
-            BufferedImage img = javax.imageio.ImageIO.read(in);
-            assertNotNull(img, "ImageIO could not decode resource: " + resourcePath);
-            return img;
-        } finally {
-            if (in != null) in.close();
-        }
-    }
+  
 }
