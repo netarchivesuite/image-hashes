@@ -66,7 +66,7 @@ for the full test suite that generated these numbers.
 
 ## Performance comparison across implementations
 
-Both hash algorithms were benchmarked against independent reference implementations on the same test image ( 1070×700 png), on the same machine(13th Gen Intel(R) Core(TM) i9-13900K), with a warmed-up JVM (JIT-compiled before timing) and Python's time.perf_counter().
+Both hash algorithms were benchmarked against independent reference implementations on the same test image (1070×700 png), on the same machine(13th Gen Intel(R) Core(TM) i9-13900K), with a warmed-up JVM (JIT-compiled before timing) and Python's time.perf_counter().
 Performance is identical for JPEG images of the same dimensions. The relative ranking between implementations also stays consistent across different image sizes — larger images are slower for all implementations, but the ratios between them remain the same, so the table below is representative regardless of the image resolution in your corpus.
 
 | Implementation | Algorithm | ms/image | Throughput |
@@ -90,6 +90,6 @@ Performance is identical for JPEG images of the same dimensions. The relative ra
 
 
 ### Lanczos resampling compatibility
-The pHash algorithm resizes the source image to 32×32 pixels using a Lanczos filter before computing the 2D DCT. Lanczos is not a single deterministic standard — different libraries make different implementation choices and produce different pixel values, resulting in incompatible hashes from the same source image.
+The pHash algorithm resizes the source image to 32×32 pixels using a **Lanczos** filter before computing the 2D DCT. Lanczos is not a single deterministic standard — different libraries make different implementation choices and produce different pixel values, resulting in incompatible hashes from the same source image.
 This library produces byte-for-byte identical hashes to phim, as both use the same Lanczos variant.
 The following libraries produce different, incompatible hashes: OpenCV, TwelveMonkeys and scikit-image.
