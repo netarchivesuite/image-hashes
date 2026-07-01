@@ -12,6 +12,22 @@ Both implementations were validated byte-for-byte against their respective
 reference implementations (Meta's C++ `pdqhash` and the National Library of
 Norway's `phim`) — see `PdqHasherTest` and `PhashHasherTest`.
 
+
+## Installation
+
+Add the following dependency to your `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>io.github.netarchivesuite</groupId>
+    <artifactId>image-hashes</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+
+
+
 ## Known limitations: what these hashes can and can't detect
 
 Both algorithms are designed to be robust to *re-encoding* (resizing, JPEG
@@ -79,6 +95,7 @@ Performance is identical for JPEG images of the same dimensions. The relative ra
 | Meta official (Java) | pdqHash (naive) | 16.3 ms | 61.3 img/sec |
 | Meta official (Java) | pdqHash (pre-allocated) | 15.6 ms | 63.9 img/sec |
 
+
 ### Notes
 
 - **PDQ**: this library is **2.6x faster** than Meta's own official Java reference implementation. The gap is explained by a single optimization: direct `DataBufferByte` pixel extraction, bypassing the per-pixel `getRGB(x, y)` call that Meta's implementation still uses. This library is also **1.5x faster** than phim's Rust-backed Python implementation.
@@ -87,6 +104,60 @@ Performance is identical for JPEG images of the same dimensions. The relative ra
 - **Meta's buffer pre-allocation**: Meta's `fromBufferedImage()` API is designed for callers to pre-allocate and reuse scratch buffers across calls. In practice this makes almost no difference (16.3ms naive vs 15.6ms pre-allocated) because the dominant cost is the per-pixel `getRGB()` loop, not buffer allocation.
 - **No official Meta/Facebook Java implementation of pHash exists** — unlike PDQ, pHash has no single canonical reference, so that cell is left blank.
 - Per-image timings are averages over 1000 hash computations, with all implementations confirmed to produce byte-for-byte identical hashes before timing.
+
+
+## Usage
+
+Both hashers take a `BufferedImage` — load it however you normally would
+(from a file, an HTTP response, a WARC record, etc.) and pass it directly.
+
+```java
+BufferedImage image = ImageIO.read(new File("photo.jpg"));
+```
+
+### pHash
+
+```java
+String hash = PhashHasher.getHash(image);
+int distance = PhashHasher.hammingDistance(hash1, hash2);
+```
+
+Hashes with a Hamming distance ≤ 10 (out of 64) are typically considered perceptually similar.
+
+### PDQ hash
+
+Hash only:
+
+```java
+String hash = PdqHasher.getHash(image);
+int distance = PdqHasher.hammingDistance(hash1, hash2);
+```
+
+Hash with quality score — useful for filtering out unreliable hashes from flat or low-detail images (quality ≤ 49 indicates a poor hash):
+
+```java
+PdqHasher.Result result = PdqHasher.getHashAndQuality(image);
+String hash    = result.hash;
+int    quality = result.quality;
+
+if (quality > 49) {
+    // hash is reliable — store or compare it
+}
+```
+
+All 8 dihedral variants (rotations and mirrors) — computed in a single pipeline pass at essentially no extra cost over a single hash:
+
+```java
+String[] hashes = PdqHasher.getAllDihedralHashes(image);
+
+// Variant names are available via PdqHasher.DIHEDRAL_NAMES:
+// original, rotate90, rotate180, rotate270, flipX, flipY, flipPlus1, flipMinus1
+
+// Check if a query image matches any orientation of a stored image:
+int distance = PdqHasher.minHammingDistance(hashes, queryHash);
+```
+
+Hashes with a Hamming distance ≤ 31 (out of 256) are typically considered perceptually similar.
 
 
 ### Lanczos resampling compatibility
