@@ -66,25 +66,25 @@ for the full test suite that generated these numbers.
 
 ## Performance comparison across implementations
 
-Both hash algorithms were benchmarked against independent reference
-implementations on the same two test images, on the same machine, with a
-warmed-up JVM (JIT-compiled before timing) and Python's `time.perf_counter()`.
-Every comparison below was correctness-checked first — all implementations
-produced byte-for-byte identical hashes before any timing was trusted.
+Both hash algorithms were benchmarked against independent reference implementations on the same test image ( 1070×700 png), on the same machine(13th Gen Intel(R) Core(TM) i9-13900K), with a warmed-up JVM (JIT-compiled before timing) and Python's time.perf_counter().
+Performance is identical for JPEG images of the same dimensions. The relative ranking between implementations also stays consistent across different image sizes — larger images are slower for all implementations, but the ratios between them remain the same, so the table below is representative regardless of the image resolution in your corpus.
 
-| Algorithm | Image | Pixel size | This library (Java) | Meta official (Java) | phim (Python/Rust) |
-|---|---|---|---|---|---|
-| PDQ | cat_nubbe.jpg | 1245×934 | 43.5 ms/image | 71.1 ms/image | 57.2 ms/image |
-| PDQ | maria.png | 1070×700 | 12.7 ms/image | 30.9 ms/image | 21.9 ms/image |
-| pHash | cat_nubbe.jpg | 1245×934 | 47.4 ms/image |  | 10.9 ms/image |
-| pHash | maria.png | 1070×700 | 29.5 ms/image |  | 7.3 ms/image |
+| Implementation | Algorithm | ms/image | Throughput |
+|---|---|---|---|
+| image-hashes (Java) | pdqHash | 6.1 ms | 163.6 img/sec |
+| image-hashes (Java) | pdqHash (8 dihedral variants) | 6.1 ms | 163.9 img/sec |
+| image-hashes (Java) | pHash | 10.8 ms | 93.0 img/sec |
+| phim (Python/Rust) | pdqHash (8 dihedral variants) | 9.1 ms | 110.2 img/sec |
+| phim (Python/Rust) | pHash | 4.1 ms | 242.1 img/sec |
+| Meta official (Java) | pdqHash (naive) | 16.3 ms | 61.3 img/sec |
+| Meta official (Java) | pdqHash (pre-allocated) | 15.6 ms | 63.9 img/sec |
 
 ### Notes
 
 - **PDQ**: this library is **1.5-2.6x faster** than Meta's own official Java
   reference implementation, and **1.3-1.8x faster** than phim's
   Rust-backed Python implementation.
-- **pHash**: phim is **4-4.3x faster** than this library. phim's pHash is
+- **pHash**: phim is **2.6x faster** than this library. phim's pHash is
   backed by a compiled Rust core (not pure Python) with a likely FFT-based
   DCT, versus this library's straightforward O(n²) DCT — closing this gap
   further would require a similar algorithmic change.
