@@ -17,8 +17,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *
  * Test coverage:
  *   1.  Identical images -> distance 0.
- *   2.  Reference image cross-check: hash of maria.png must equal the
- *       phim (Rust/Python) reference value (if the file is present; skipped otherwise).
+ *   2.  Reference image cross-check: hash of cat_01_original.jpg must equal the
+ *       phim (Rust/Python) reference value 
  *   3.  Different images -> large distance.
  *   4.  2D DCT bug check: H-gradient and V-gradient produce different hashes.
  *   5.  Hex round-trip correct.
