@@ -49,7 +49,7 @@ class PdqHasherCatImageSetTest {
     /** Classpath-relative location: src/test/resources/test_images/ */
     private static final String IMAGE_DIR = "test_images/";
 
-    private static final int SIMILARITY_THRESHOLD=31; // Seems to be the general recommendation.
+    private static final int SIMILARITY_THRESHOLD=31; // Seems to be the general recommendation for PDQ-hash
     
     private static String originalHash;
 
