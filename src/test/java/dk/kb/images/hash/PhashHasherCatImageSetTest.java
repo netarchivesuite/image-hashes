@@ -47,13 +47,13 @@ class PhashHasherCatImageSetTest {
 
     /** Classpath-relative location: src/test/resources/test_images/ */
     private static final String IMAGE_DIR = "test_images/";
-
+    private static final int SIMILARITY_THRESHOLD=10; // Seems to be the general recommendation for pHash
     private static String originalHash;
 
     @BeforeAll
     static void setUp() throws IOException {
         BufferedImage original = loadImage("cat_01_original.jpg");
-        originalHash = PhashHasher.getHash(original);
+        originalHash = PhashHasher.getHash(original);         
     }
 
     @Test
@@ -63,8 +63,8 @@ class PhashHasherCatImageSetTest {
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_01_original.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 0)
+        assertEquals(0,  distance);
+        assertTrue(match(distance));            
     }
 
     @Test
@@ -74,8 +74,8 @@ class PhashHasherCatImageSetTest {
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_02_downscaled.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 0)
+        assertEquals(0,  distance);
+        assertTrue(match(distance));                
     }
 
     @Test
@@ -85,8 +85,8 @@ class PhashHasherCatImageSetTest {
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_03_grayscale.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 0)
+        assertEquals(0,  distance);
+        assertTrue(match(distance));
     }
 
     @Test
@@ -96,8 +96,8 @@ class PhashHasherCatImageSetTest {
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_04_rotated45.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 28) -- documents a known
+        assertEquals(28,  distance);
+        assertFalse(match(distance));        
         // pHash limitation: the algorithm is not rotation-invariant.
     }
 
@@ -108,8 +108,8 @@ class PhashHasherCatImageSetTest {
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_05_rotated90.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 32) -- documents a known
+        assertEquals(32,  distance);
+        assertFalse(match(distance));        
         // pHash limitation: the algorithm is not rotation-invariant.
     }
 
@@ -120,9 +120,8 @@ class PhashHasherCatImageSetTest {
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_06_rotated180.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 34) -- documents a known
-        // pHash limitation: the algorithm is not rotation-invariant.
+        assertEquals(34,  distance);
+        assertFalse(match(distance));        
     }
 
     @Test
@@ -132,8 +131,8 @@ class PhashHasherCatImageSetTest {
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_07_mirrored.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 30) -- documents a known
+        assertEquals(30,  distance);
+        assertFalse(match(distance));
         // pHash limitation: the algorithm is not mirror-invariant.
     }
 
@@ -144,8 +143,8 @@ class PhashHasherCatImageSetTest {
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_08_noise.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 0)
+        assertEquals(0,  distance);
+        assertTrue(match(distance));        
     }
 
     @Test
@@ -155,8 +154,8 @@ class PhashHasherCatImageSetTest {
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_09_text_opaque.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 6)
+        assertEquals(6,  distance);
+        assertTrue(match(distance));        
     }
 
     @Test
@@ -166,8 +165,8 @@ class PhashHasherCatImageSetTest {
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_10_text_overlay.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 2)
+        assertEquals(2,  distance);
+        assertTrue(match(distance));                
     }
 
     @Test
@@ -177,8 +176,8 @@ class PhashHasherCatImageSetTest {
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_11_jpeg_lowquality.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 0)
+        assertEquals(0,  distance);
+        assertTrue(match(distance));        
     }
 
     @Test
@@ -188,11 +187,15 @@ class PhashHasherCatImageSetTest {
         String hash = PhashHasher.getHash(img);
         int distance = PhashHasher.hammingDistance(originalHash, hash);
         System.out.println("cat_12_cropped.jpg distance = " + distance);
-
-        // TODO: assert expected distance (measured: 32) -- cropping shifts
+        assertEquals(32,  distance);
+        assertFalse(match(distance));               
         // the framing enough that pHash's similarity threshold is exceeded.
     }
-
+    
+    private static boolean match(int distance) {
+        return (distance <= SIMILARITY_THRESHOLD);
+    }
+    
     // -----------------------------------------------------------------------
 
     private static BufferedImage loadImage(String filename) throws IOException {
