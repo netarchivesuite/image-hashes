@@ -81,15 +81,15 @@ Performance is identical for JPEG images of the same dimensions. The relative ra
 
 ### Notes
 
-- **PDQ**: this library is **1.5-2.6x faster** than Meta's own official Java
-  reference implementation, and **1.3-1.8x faster** than phim's
-  Rust-backed Python implementation.
-- **pHash**: phim is **2.6x faster** than this library. phim's pHash is
-  backed by a compiled Rust core (not pure Python) with a likely FFT-based
-  DCT, versus this library's straightforward O(n²) DCT — closing this gap
-  further would require a similar algorithmic change.
-- No official Meta/Facebook Java implementation of pHash exists — unlike
-  PDQ, pHash has no single canonical reference, so that cell is left blank.
-- Per-image timings are averages over 100-1000 hash computations per cell,
-  with all implementations confirmed to produce identical hashes before
-  timing.
+- **PDQ**: this library is **2.6x faster** than Meta's own official Java reference implementation. The gap is explained by a single optimization: direct `DataBufferByte` pixel extraction, bypassing the per-pixel `getRGB(x, y)` call that Meta's implementation still uses. This library is also **1.5x faster** than phim's Rust-backed Python implementation.
+- **PDQ dihedral variants**: computing all 8 rotation/mirror variants via `getAllDihedralHashes()` costs essentially the same as computing a single hash — both pay the same dominant cost (pixel extraction, Jarosz filter, 2D DCT) exactly once. The 7 extra variants are derived cheaply from the same 16×16 2D DCT buffer without re-running the pipeline.
+- **pHash**: phim is **2.6x faster** than this library. phim's pHash is backed by a compiled Rust core (not pure Python) with a likely FFT-based 2D DCT, versus this library's straightforward O(n²) 2D DCT — closing this gap further would require adopting a similar FFT-based approach.
+- **Meta's buffer pre-allocation**: Meta's `fromBufferedImage()` API is designed for callers to pre-allocate and reuse scratch buffers across calls. In practice this makes almost no difference (16.3ms naive vs 15.6ms pre-allocated) because the dominant cost is the per-pixel `getRGB()` loop, not buffer allocation.
+- **No official Meta/Facebook Java implementation of pHash exists** — unlike PDQ, pHash has no single canonical reference, so that cell is left blank.
+- Per-image timings are averages over 1000 hash computations, with all implementations confirmed to produce byte-for-byte identical hashes before timing.
+
+
+### Lanczos resampling compatibilityLanczos resampling compatibility
+The pHash algorithm resizes the source image to 32×32 pixels using a Lanczos filter before computing the DCT. Lanczos is not a single deterministic standard — different libraries make different implementation choices and produce different pixel values, resulting in incompatible hashes from the same source image.
+This library produces byte-for-byte identical hashes to phim, as both use the same Lanczos variant.
+The following libraries produce different, incompatible hashes: OpenCV, TwelveMonkeys and scikit-image.
