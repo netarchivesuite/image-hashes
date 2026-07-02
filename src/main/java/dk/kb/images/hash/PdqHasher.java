@@ -44,12 +44,7 @@ import java.awt.image.DataBufferByte;
  * BSD-licensed, same as the Meta original.
  */
 public class PdqHasher {
-
-    // -----------------------------------------------------------------------
-    // Constants
-    // -----------------------------------------------------------------------
-
-    public static final int HASH_BITS = 256;
+   
 
     /**
      * Names of the 8 dihedral variants returned by
@@ -104,6 +99,7 @@ public class PdqHasher {
     /**
      * Compute the PDQ hash of a BufferedImage.
      *
+     * @param image, the image converted to BufferedImage
      * @return the 256-bit hash as a 64-character lowercase hex string
      *         (ThreatExchange wire format).
      */
@@ -120,6 +116,9 @@ public class PdqHasher {
      * 64×64 downsampled scale. The reference recommends discarding
      * hashes with quality ≤ 49 — those come from flat, low-information,
      * or very small images and are unreliable for similarity matching.
+     * 
+     * @param image, the image converted to BufferedImage
+     * @return quality with value >0. Quality > 49 is considered good enough for hashing
      */
     public static int getQuality(BufferedImage image) {
         return computeDctBuffer(image).quality;
@@ -149,6 +148,9 @@ public class PdqHasher {
      * {@link #getQuality(BufferedImage)} separately on the same image
      * runs the full Jarosz-filter-plus-DCT pipeline twice. Use this
      * method instead when you need both values for the same image.
+     * 
+     * @param image, the image converted to BufferedImage
+     * @return Result object with the hash and quality.
      */
     public static Result getHashAndQuality(BufferedImage image) {
         DctBuffer dctBuf = computeDctBuffer(image);
@@ -168,6 +170,7 @@ public class PdqHasher {
      * detect that an incoming image is a 90°-rotated copy of one already
      * indexed, without storing 8 separate hashes per image up front.
      *
+     * @param image, the image converted to BufferedImage
      * @return 8 hex-string hashes, in the order given by {@link #DIHEDRAL_NAMES}.
      */
     public static String[] getAllDihedralHashes(BufferedImage image) {

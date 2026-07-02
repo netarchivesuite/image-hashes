@@ -48,8 +48,6 @@ public class PhashHasher {
     // Constants
     // -----------------------------------------------------------------------
 
-    public static final int HASH_BITS = 64;
-
     private static final int DCT_SIZE   = 32;  // resize target / DCT input size
     private static final int BLOCK_SIZE = 8;   // low-frequency block side (64 bits)
     private static final int BLOCK_OFFSET = 1; // skip index 0 in both dimensions
@@ -70,7 +68,7 @@ public class PhashHasher {
      * algorithm; low-information images (solid colour, etc.) still
      * produce a hash, just one that is not meaningful. Apply the same
      * "skip small/flat images" filtering policy used for PDQ if needed.
-     *
+     * @param image, the image converted to BufferedImage
      * @return the 64-bit hash as a 16-character lowercase hex string.
      */
     public static String getHash(BufferedImage image) {
