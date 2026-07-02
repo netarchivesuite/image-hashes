@@ -13,6 +13,14 @@
   16-character hash into 2 substrings of 8 characters each. Note that pHash is less suited
   for band-based search than PDQ due to its shorter hash length — see Javadoc for details.
 
+```xml
+<dependency>
+    <groupId>io.github.netarchivesuite</groupId>
+    <artifactId>image-hashes</artifactId>
+    <version>1.1.0</version>
+</dependency>
+```
+
 ## [1.0.0] - 2026-07-01
 
 First public release.
