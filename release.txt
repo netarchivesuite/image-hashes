@@ -1,0 +1,4 @@
+1) update pom.version
+2) mvn clean deploy -P release
+3) go https://central.sonatype.com/publishing/deployments, select publish... wait up to 30 minutes
+4) Make new github binary release. Upload all 3 jars in /target folder.
