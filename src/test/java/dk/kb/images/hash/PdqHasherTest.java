@@ -210,6 +210,28 @@ class PdqHasherTest {
         return img;
     }
 
+    @Test
+    @DisplayName("splitIntoBands splits a known hash into 8 correct substrings")
+    void splitIntoBandsProducesCorrectSubstrings() {
+        String hash = "aa74a9e4b3952eb95c5711e6a5b2dad1d5a852c62e0155b995ae2be4d823e31c";
+ 
+        String[] bands = PdqHasher.splitIntoBands(hash);
+ 
+        assertEquals(8, bands.length);
+        assertEquals("aa74a9e4", bands[0]);
+        assertEquals("b3952eb9", bands[1]);
+        assertEquals("5c5711e6", bands[2]);
+        assertEquals("a5b2dad1", bands[3]);
+        assertEquals("d5a852c6", bands[4]);
+        assertEquals("2e0155b9", bands[5]);
+        assertEquals("95ae2be4", bands[6]);
+        assertEquals("d823e31c", bands[7]);
+ 
+        // Concatenating all bands must reproduce the original hash exactly
+        assertEquals(hash, String.join("", bands));
+    }
+ 
+    
     @SuppressWarnings("unused") // kept for parity with PhashHasherTest / potential future tests
     private static BufferedImage copyImage(BufferedImage src) {
         BufferedImage copy = new BufferedImage(src.getWidth(), src.getHeight(), src.getType());

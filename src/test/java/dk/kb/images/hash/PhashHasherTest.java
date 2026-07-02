@@ -119,6 +119,23 @@ class PhashHasherTest {
         assertTrue(dist < 10, "Expected distance < 10 (of 64) for a 50% resize, got " + dist);
     }
 
+
+    @Test
+    @DisplayName("splitIntoBands splits a known hash into 2 correct substrings")
+    void splitIntoBandsProducesCorrectSubstrings() {
+        String hash = "38e427759da86355";
+ 
+        String[] bands = PhashHasher.splitIntoBands(hash);
+ 
+        assertEquals(2, bands.length);
+        assertEquals("38e42775", bands[0]);
+        assertEquals("9da86355", bands[1]);
+ 
+        // Concatenating both bands must reproduce the original hash exactly
+        assertEquals(hash, String.join("", bands));
+    }
+
+    
     // -----------------------------------------------------------------------
     // Image generators
     // -----------------------------------------------------------------------

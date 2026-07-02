@@ -129,7 +129,11 @@ public class PdqHasher {
      * {@link #getHashAndQuality(BufferedImage)} call.
      */
     public static final class Result {
+        /** The 256-bit PDQ hash as a 64-character lowercase hex string. */
         public final String hash;
+        
+        /** Quality score in the range 0–100. Values ≤ 49 indicate a flat or
+         *  low-detail image where the hash is considered unreliable. */
         public final int quality;
 
         Result(String hash, int quality) {
@@ -232,6 +236,62 @@ public class PdqHasher {
         return min;
     }
 
+    /**
+     * Splits a 64-character PDQ hash string into 8 disjoint substrings of
+     * 8 characters each, suitable for indexing in a multi-band Solr field
+     * to enable efficient approximate Hamming distance search at scale.
+     *
+     * <p>The 64-character hash is divided into 8 consecutive, non-overlapping
+     * bands of 8 characters (32 bits) each:
+     * <pre>
+     *   hash:   aa74a9e4 b3952eb9 5c5711e6 a5b2dad1 d5a852c6 2e0155b9 95ae2be4 d823e31c
+     *   band 0: aa74a9e4
+     *   band 1: b3952eb9
+     *   band 2: 5c5711e6
+     *   band 3: a5b2dad1
+     *   band 4: d5a852c6
+     *   band 5: 2e0155b9
+     *   band 6: 95ae2be4
+     *   band 7: d823e31c
+     * </pre>
+     *
+     * <p>The pigeonhole principle guarantees that if two hashes differ by at
+     * most 7 bits, at least one of the 8 bands must be identical — so an
+     * exact Solr match on any single band is sufficient to retrieve the
+     * candidate, which is then verified with a full Hamming distance check.
+     *
+     * <p>For large-scale indexing, store all 8 band values per image in 8
+     * separate Solr string fields ({@code pdq_band_0} through
+     * {@code pdq_band_7}), one value per field. At query time, probe all
+     * 8 fields with the corresponding bands of the query hash (64 probes
+     * total when combined with the 8 dihedral variants from
+     * {@link #getAllDihedralHashes(BufferedImage)}).
+     *
+     * @see <a href="https://www.cs.toronto.edu/~norouzi/research/papers/multi_index_hashing.pdf">
+     * Fast Search in Hamming Space with Multi-Index Hashing (Norouzi et al.)</a>
+     *
+     * @param hash a 64-character lowercase hex PDQ hash string, as returned
+     *             by {@link #getHash(BufferedImage)} or
+     *             {@link PdqHasher.Result#hash}
+     * @return a {@code String[8]} where entry {@code i} contains characters
+     *         {@code [i*8 .. i*8+7]} of the input hash (band index 0 to 7)
+     * @throws IllegalArgumentException if {@code hash} is not exactly 64
+     *                                  characters long
+     */
+    public static String[] splitIntoBands(String hash) {
+        if (hash.length() != 64) {
+            throw new IllegalArgumentException(
+                "PDQ hash must be 64 characters, got " + hash.length());
+        }
+        String[] bands = new String[8];
+        for (int i = 0; i < 8; i++) {
+            bands[i] = hash.substring(i * 8, i * 8 + 8);
+        }
+        return bands;
+    }
+ 
+
+    
     // -----------------------------------------------------------------------
     // Internal: luma extraction (with fast paths for common BufferedImage types)
     // -----------------------------------------------------------------------

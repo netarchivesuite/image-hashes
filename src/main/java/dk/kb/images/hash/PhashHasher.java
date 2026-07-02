@@ -140,6 +140,55 @@ public class PhashHasher {
         return hammingDistance(fromHexString(hashA), fromHexString(hashB));
     }
 
+    /**
+     * Splits a 16-character pHash string into 2 disjoint substrings of
+     * 8 characters each, for use as band values in approximate similarity
+     * search (e.g. in a Solr multi-band index).
+     *
+     * <p>The 16-character hash is divided into 2 consecutive, non-overlapping
+     * bands of 8 characters (32 bits) each:
+     * <pre>
+     *   hash:   38e42775 9da86355
+     *   band 0: 38e42775
+     *   band 1: 9da86355
+     * </pre>
+     *
+     * <p><b>Note:</b> pHash is significantly less suited for band-based
+     * similarity search than PDQ hash. PDQ's 256-bit hash splits into 8
+     * bands of 32 bits each, giving the pigeonhole principle enough room
+     * to guarantee that near-duplicate images share at least one identical
+     * band. pHash's 64-bit hash splits into only 2 bands, which means the
+     * probability of two near-duplicate hashes sharing an identical band is
+     * much lower — differing bits are far more likely to appear in both bands
+     * simultaneously, causing the candidate to be missed entirely. pHash is
+     * therefore best used as a client-side Hamming distance filter on
+     * candidates already retrieved via PDQ band search, rather than as a
+     * standalone band index.
+     * 
+     * @see <a href="https://www.cs.toronto.edu/~norouzi/research/papers/multi_index_hashing.pdf">
+     * Fast Search in Hamming Space with Multi-Index Hashing (Norouzi et al.)</a>
+     *
+     * @param hash a 16-character lowercase hex pHash string, as returned
+     *             by {@link #getHash(BufferedImage)}
+     * @return a {@code String[2]} where entry {@code i} contains characters
+     *         {@code [i*8 .. i*8+7]} of the input hash (band index 0 or 1)
+     * @throws IllegalArgumentException if {@code hash} is not exactly 16
+     *                                  characters long
+     */
+    public static String[] splitIntoBands(String hash) {
+        if (hash.length() != 16) {
+            throw new IllegalArgumentException(
+                "pHash hash must be 16 characters, got " + hash.length());
+        }
+        return new String[] {
+            hash.substring(0, 8),
+            hash.substring(8, 16)
+        };
+    }
+ 
+
+    
+    
     /** Hamming distance between two 8-byte pHash arrays (internal use). */
     static int hammingDistance(byte[] a, byte[] b) {
         int dist = 0;
