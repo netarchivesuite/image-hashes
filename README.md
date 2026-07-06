@@ -6,7 +6,7 @@ netarchive:
 
 - **`PdqHasher`** — Meta's [PDQ hash](https://github.com/facebook/ThreatExchange/tree/main/pdq), a 256-bit perceptual hash.
 - **`PhashHasher`** — the classic DCT-based pHash, 64-bit, compatible with the
-  [phim](https://github.com/NationalLibraryOfNorway/webdata-wp3-phim) Python/Rust reference implementation.
+  [phim](https://github.com/NationalLibraryOfNorway/webdata-wp3-phim) Python/C reference implementation.
 
 Both implementations were validated byte-for-byte against their respective
 reference implementations (Meta's C++ `pdqhash` and the National Library of
